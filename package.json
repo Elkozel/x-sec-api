@@ -1,0 +1,19 @@
+{
+  "name": "x-sports_and_culture-api",
+  "version": "0.1.0",
+  "description": "An educational project to exercise my skills and knowledge working with Burp Suite and reverse engineering",
+  "main": "api.js",
+  "scripts": {
+    "test": "echo \"Yeah, no tests, sorry Andy :(\""
+  },
+  "keywords": [
+    "api",
+    "educational",
+    "exercise"
+  ],
+  "author": "TSV",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^4.4.4"
+  }
+}
