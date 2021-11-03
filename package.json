@@ -4,6 +4,8 @@
   "description": "An educational project to exercise my skills and knowledge working with Burp Suite and reverse engineering",
   "main": "api.js",
   "scripts": {
+    "compile": "tsc api.ts",
+    "start": "tsc api.ts && node api.js",
     "test": "echo \"Yeah, no tests, sorry Andy :(\""
   },
   "keywords": [
@@ -15,5 +17,14 @@
   "license": "MIT",
   "devDependencies": {
     "typescript": "^4.4.4"
+  },
+  "dependencies": {
+    "@types/date-and-time": "^0.13.0",
+    "@types/dateformat": "^3.0.1",
+    "@types/node": "^7.10.14",
+    "axios": "^0.24.0",
+    "date-and-time": "^2.0.1",
+    "dateformat": "^5.0.2",
+    "fs": "^0.0.1-security"
   }
 }
