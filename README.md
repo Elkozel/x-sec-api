@@ -14,3 +14,53 @@ cd ./x-api
 npm install .
 ```
 
+## Terminoligy
+Explains the basic terminology used by the API:
+
+OnlineGroup *contains* Product *contains* Slot ... etc
+
+## Code
+
+### Interfaces
+The interfaces will be explained in a simple way, if you would like to see more information, please take a look at the code
+
+**DefaultResponse** - the minimal response expected for a successful operation
+
+**DefaultErrorResponse** - the expected response for an error returned from the server
+
+**OnlineGroup** - an online group (e.g. "Tennis Courts", "Beach Volleyball Courts", "Fitness Time-Slots", etc.)
+
+**OnlineGroupsResponse** - the usual response when all online groups are requested
+
+**Product** - a product (e.g. the different tennis courts, sports halls, etc.)
+
+**ProductByIdResponse** - the usual response when a product by ID is retrieved
+
+**Slot** - a slot (e.g. a slot from {time} to {time} for tennis court {number})
+
+**AvailableSpotsResponse** - the usual response when all available slots are requested
+    
+**Booking** - a booking
+
+### Functions
+Same information as in the tsdoc:
+
+**getBaseJSON** - Returns an Object with the minimal information required for a request plus the information from the additionally provided object
+
+**checkVersion** - Checks if the version of the API is complient with the current version
+
+**onlineGroups** - Retrieves all Online Groups
+
+**getProductsByOnlineGroup** - Gets all products by online group
+
+**getProductById** - Gets additional information about a product, based on its ID
+
+**getAvailableSlots** - Returns all available slots for a product on the specified date
+
+**addReservationBooking** - Adds a reservation for the product on the specified slot
+
+**addBooking** - Adds a booking to the account of the user
+
+**myBookings** - Retrieves all bookings of the customer
+
+**cancelBooking** - Cancels a booking
