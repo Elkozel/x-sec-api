@@ -14,12 +14,12 @@ cd ./x-api
 npm install .
 ```
 
-## Terminoligy
+## Code
+
+## Terminoligy (WIP)
 Explains the basic terminology used by the API:
 
 OnlineGroup *contains* Product *contains* Slot ... etc
-
-## Code
 
 ### Interfaces
 The interfaces will be explained in a simple way, if you would like to see more information, please take a look at the code
@@ -50,3 +50,8 @@ Same information as in the tsdoc:
 | getProductById            	|  Gets additional information about   a product, based on its ID                                                                       	|
 | getProductsByOnlineGroup  	|  Gets all products by online group                                                                                                    	|
 | myBookings                	|  Retrieves all bookings of the   customer                                                                                             	|
+
+
+### More info
+
+For more information, please take a look at [the procedures document](procedures.md).
