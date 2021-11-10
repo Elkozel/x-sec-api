@@ -10,6 +10,14 @@
 7. AddReservationBooking
 8. myBookings
 
+## User wants to book a fitness spot
+1. Login
+2. Version
+3. onlineGroups
+4. UniqueLocationsByOnlineGroup
+5. schedule
+6. addBooking
+
 ## User wants to remove a booking
 
 
