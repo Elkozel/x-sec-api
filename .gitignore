@@ -3,3 +3,4 @@
 /*.js
 /out/*
 data/sensitive.json
+/data

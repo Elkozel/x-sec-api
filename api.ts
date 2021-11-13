@@ -1,6 +1,7 @@
 import axios, { AxiosInstance } from "axios";
-import { format } from 'date-and-time';
+import { extend, format } from 'date-and-time';
 import * as fs from "fs";
+import { version } from "process";
 
 const sensitiveData = JSON.parse(fs.readFileSync("data/sensitive.json", "UTF-8"));
 
@@ -74,7 +75,10 @@ namespace APIClient {
         Min_participants: string,
         Online_tennis: string,
     }
-    
+
+    /**
+     * Represents a Booking
+     */
     export interface Booking {
         booking_id: string,
         bezetting: string,
@@ -151,7 +155,7 @@ class APIClient {
                 console.info(`Version was successfully checked (${res.data})`);
             })
             .catch(err => {
-                throw new Error(`[${err.response.status}] Error: ${err.message} (Message: ${err.response.data.message})`);
+                throw new Error(this.GenerateErrorMsg(err));
             })
     }
 
@@ -172,7 +176,7 @@ class APIClient {
                 return res.data;
             })
             .catch(err => {
-                throw new Error(`[${err.response.status}] Error: ${err.message} (Message: ${err.response.data.message})`);
+                throw new Error(this.GenerateErrorMsg(err));
             })
     }
 
@@ -197,7 +201,7 @@ class APIClient {
                 return res.data;
             })
             .catch(err => {
-                throw new Error(`[${err.response.status}] Error: ${err.message} (Message: ${err.response.data.message})`);
+                throw new Error(this.GenerateErrorMsg(err));
             })
     }
 
@@ -223,7 +227,7 @@ class APIClient {
                 return Product;
             })
             .catch(err => {
-                throw new Error(`[${err.response.status}] Error: ${err.message} (Message: ${err.response.data.message})`);
+                throw new Error(this.GenerateErrorMsg(err));
             })
     }
 
@@ -246,7 +250,7 @@ class APIClient {
                 return res.data;
             })
             .catch(err => {
-                throw new Error(`[${err.response.status}] Error: ${err.message} (Message: ${err.response.data.message})`);
+                throw new Error(this.GenerateErrorMsg(err));
             })
     }
 
@@ -278,15 +282,7 @@ class APIClient {
                 return res.data;
             })
             .catch(err => {
-                // Deconstruct Error
-                let { response, error, code, message }: APIClient.DefaultErrorResponse = err.response.data;
-
-                // Extreme case (Should never happen)
-                if (response == 0)
-                    throw new Error(`[${code}] Error was thrown, but the response is ${response} (Message: ${message})`);
-
-                // Throw regular error
-                throw new Error(`[${code}] Error: ${err.message} (Message: ${message})`);
+                throw new Error(this.GenerateErrorMsg(err));
             })
     }
 
@@ -308,7 +304,7 @@ class APIClient {
                 return;
             })
             .catch(err => {
-                throw new Error(`[${err.response.status}] Error: ${err.message} (Message: ${err.response.data.message})`);
+                throw new Error(this.GenerateErrorMsg(err));
             })
     }
 
@@ -329,7 +325,7 @@ class APIClient {
                 return mybookings;
             })
             .catch(err => {
-                throw new Error(`[${err.response.status}] Error: ${err.message} (Message: ${err.response.data.message})`);
+                throw new Error(this.GenerateErrorMsg(err));
             })
     }
 
@@ -351,8 +347,39 @@ class APIClient {
                 return;
             })
             .catch(err => {
-                throw new Error(`[${err.response.status}] Error: ${err.message} (Message: ${err.response.data.message})`);
+                throw new Error(this.GenerateErrorMsg(err));
             })
+    }
+
+    /**
+     * A simple way of logging errors from Axios requests, which did not recieve a response
+     * @param err the error which was recieved from Axios
+     */
+    protected axiosErrorMsg(err: any): string {
+        let axiosMessage = err.message;
+
+        throw new Error(`Axios Error: ${axiosMessage}`);
+    }
+
+    /**
+     * A simple way of logging errors from Axios requests, which did recieve a response
+     * @param err the error which was recieved from Axios
+     * @param apiError the API error, which was inside the Axios error
+     */
+    protected APIErrorMsg(err: any, apiError: APIClient.DefaultErrorResponse): string {
+        let axiosMessage = err.message;
+
+        throw new Error(`[${apiError.code}] API Error: ${apiError.error.message} (Axios Message: ${axiosMessage})`);
+
+    }
+
+    /**
+     * A function wrapper for APIError or AxiosError
+     * @param err The error from Axios
+     * @returns The error message
+     */
+    protected GenerateErrorMsg(err: any): string {
+        return (err.response) ? this.APIErrorMsg(err, err.response.data) : this.axiosErrorMsg(err);        
     }
 }
 
@@ -375,3 +402,4 @@ api.checkVersion()
         if (err)
             console.log(err);
     })
+
