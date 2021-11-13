@@ -83,7 +83,16 @@ POST /users/login
 ```
 
 ### Fail Response
-```
+```json
+{
+    "response": 1,
+    "error": {
+        "reason": "invalidToken",
+        "message": "Invalid token."
+    },
+    "code": 403,
+    "message": "Invalid token"
+}
 ```
 
 ## Check Version
@@ -107,6 +116,15 @@ POST /users/CheckVersion
 
 ### Fail Response
 ```json
+{
+    "response": 1,
+    "error": {
+        "reason": "IncompatibleVersion",
+        "message": "A new version should be available in the app.."
+    },
+    "code": "400",
+    "message": "A new version should be available in the app."
+}
 ```
 
 ## Online Groups
