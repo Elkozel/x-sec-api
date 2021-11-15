@@ -1,100 +1,12 @@
 import axios, { AxiosInstance } from "axios";
-import { extend, format } from 'date-and-time';
+import { format } from 'date-and-time';
 import * as fs from "fs";
-import { version } from "process";
+import * as API from "./interfaces/_index";
 
 const sensitiveData = JSON.parse(fs.readFileSync("data/sensitive.json", "UTF-8"));
 
 const DEFAULT_URL: string = sensitiveData.URL;
 const DEFAULT_VERSION: string = sensitiveData.version;
-
-/**
- * Namespace for useless interfaces
- */
-namespace APIClient {
-    export interface DefaultResponse {
-        response: number,
-        message: string
-    }
-
-    export interface DefaultErrorResponse {
-        response: number,
-        error: {
-            reason: string,
-            message: string
-        },
-        code: number,
-        message: string
-    }
-
-    export interface OnlineGroup {
-        online_group: string
-    }
-
-    export interface OnlineGroupsResponse {
-        response: number,
-        message: string,
-        onlinegroups?: OnlineGroup[]
-        onlinegroups_open?: OnlineGroup[]
-    }
-
-    export interface Product {
-        Product_id: string,
-        Description: string,
-        Type?: number,
-        Admin_code?: string,
-        Price?: string,
-        Category_1_price?: string,
-        Category_2_price?: string,
-        Category_3_price?: string,
-        Prep_time?: string,
-        Dism_time?: string,
-        Slot_size?: string,
-        Max_participants?: string
-    }
-
-    export interface ProductByIdResponse {
-        Product_exists: string,
-        Product: Product
-    }
-
-    export interface Slot {
-        Start_date: string,
-        End_date: string
-    }
-
-    export interface AvailableSpotsResponse {
-        Message: string,
-        Server_time: string,
-        Empty_slots: Slot[],
-        Divided_slots: Slot[],
-        Prep_time: string,
-        Dism_time: string,
-        Slot_size: string,
-        Slot_price: string,
-        Min_participants: string,
-        Online_tennis: string,
-    }
-
-    /**
-     * Represents a Booking
-     */
-    export interface Booking {
-        booking_id: string,
-        bezetting: string,
-        locatie: string,
-        sportomschrijving: string,
-        site: string,
-        start_date: string,
-        end_time: string,
-        trainer: string,
-        memo: string,
-        online_all: string,
-        amount: string,
-        paid: string,
-        start_time: string
-    }
-}
 
 class APIClient {
     protected readonly customer_id: string;
@@ -143,12 +55,14 @@ class APIClient {
      * Checks if the version of the API is complient with the current version
      * @returns an empty promise, just for simplicity
      */
-    checkVersion(): Promise<void> {
-        let data = {
+    async checkVersion(customer_id = this.customer_id, license = this.license, version = DEFAULT_VERSION): Promise<void> {
+        let data : API.CheckVersion.Request = {
             customer_id: this.customer_id,
             license: this.license,
             version: DEFAULT_VERSION
         }
+
+        return this.instance.post
 
         return this.instance.post("/users/CheckVersion", data)
             .then(res => {
@@ -163,13 +77,13 @@ class APIClient {
      * Retrieves all Online Groups
      * @returns all online groups
      */
-    onlineGroups(): Promise<APIClient.OnlineGroupsResponse> {
+    onlineGroups() {
         let data = this.getBaseJSON({});
 
         return this.instance.post("/bookings/onlineGroups", data)
             .then(res => {
                 // Deconstruct response
-                let { response, message, onlinegroups, onlinegroups_open }: APIClient.OnlineGroupsResponse = res.data;
+                let { response, message, onlinegroups, onlinegroups_open }: API.OnlineGroups.Request = res.data;
 
                 // Log and return
                 console.info(`[${res.status}] ${res.statusText}`);
@@ -332,10 +246,12 @@ class APIClient {
     /**
      * Cancels a booking
      * @param booking the booking to be canceled
-     * @returns an empty promise
+     * @returns The response from the server (0 for no error)
      */
-    cancelBooking(booking: APIClient.Booking): Promise<void> {
-        let data = this.getBaseJSON({ booking_id: booking.booking_id });
+    async cancelBooking(booking: APIClient.Booking): number {
+        let req = this.getBaseJSON({ booking_id: booking.booking_id });
+
+        let { response, message, mybookings } = (await (this.instance.post("/bookings/cancelBooking", req))).data
 
         return this.instance.post("/bookings/cancelBooking", data)
             .then(res => {
@@ -379,7 +295,7 @@ class APIClient {
      * @returns The error message
      */
     protected GenerateErrorMsg(err: any): string {
-        return (err.response) ? this.APIErrorMsg(err, err.response.data) : this.axiosErrorMsg(err);        
+        return (err.response) ? this.APIErrorMsg(err, err.response.data) : this.axiosErrorMsg(err);
     }
 }
 
@@ -402,4 +318,3 @@ api.checkVersion()
         if (err)
             console.log(err);
     })
-
