@@ -4,3 +4,4 @@
 /out/*
 data/sensitive.json
 /data
+interfaces/*.js

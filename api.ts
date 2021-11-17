@@ -16,6 +16,9 @@ class APIClient {
     // The Axios Instance, which will be used to send the requests
     protected instance: AxiosInstance;
 
+    // Private data about the client
+    private userInfo?: API.User;
+
     /**
      * Constructs an API client
      * @param customer_id the ID of the customer (Usually a static ID, used by the product owners)
@@ -33,8 +36,9 @@ class APIClient {
             baseURL: URL
         })
 
-        // Usually the version is checked upon initializing, however one does not simply DOS when Debugging
-        //this.checkVersion();
+        // Usually the version and logon is checked upon initializing, however one does not simply DOS when Debugging (Disable this when debugging)
+        this.checkVersion();
+        this.logIn();
     }
 
     /**
@@ -42,7 +46,7 @@ class APIClient {
      * @param addition the additional information to be concatinated to the end result
      * @returns an object which contains both the basic information about a request and the additional information provided
      */
-    getBaseJSON(addition: object = {}): { customer_id: string, license: string, token: string } {
+    getBaseJSON(addition: object = {}) {
         return {
             customer_id: this.customer_id,
             license: this.license,
@@ -53,70 +57,95 @@ class APIClient {
 
     /**
      * Checks if the version of the API is complient with the current version
-     * @returns an empty promise, just for simplicity
+     * @returns void
+     * @throws a VersionMismatched error when the version of the API is not accurate
      */
-    async checkVersion(customer_id = this.customer_id, license = this.license, version = DEFAULT_VERSION): Promise<void> {
-        let data : API.CheckVersion.Request = {
+    async checkVersion(): Promise<void> {
+        let data: API.CheckVersion.Request = {
             customer_id: this.customer_id,
             license: this.license,
             version: DEFAULT_VERSION
         }
 
-        return this.instance.post
+        let response = await this.instance.post(API.CheckVersion.URL, data);
+        let responseData = response.data;
+    }
 
-        return this.instance.post("/users/CheckVersion", data)
-            .then(res => {
-                console.info(`Version was successfully checked (${res.data})`);
-            })
-            .catch(err => {
-                throw new Error(this.GenerateErrorMsg(err));
-            })
+    /**
+     * Checks if the user is logged in
+     * @returns void
+     */
+    async logIn(): Promise<void> {
+        let data = this.getBaseJSON({
+            remember: false,
+            pushid: "AppPushID"
+        });
+
+        let response = await this.instance.post(API.Login.URL, data);
+        let responseData: API.Login.Success = response.data;
+
+        this.userInfo = responseData.user;
     }
 
     /**
      * Retrieves all Online Groups
      * @returns all online groups
      */
-    onlineGroups() {
-        let data = this.getBaseJSON({});
+    async onlineGroups(): Promise<API.OnlineGroups.Success> {
+        let data: API.OnlineGroups.Request = this.getBaseJSON({});
 
-        return this.instance.post("/bookings/onlineGroups", data)
-            .then(res => {
-                // Deconstruct response
-                let { response, message, onlinegroups, onlinegroups_open }: API.OnlineGroups.Request = res.data;
+        let response = await this.instance.post(API.OnlineGroups.URL, data);
+        let responseData: API.OnlineGroups.Success = response.data;
 
-                // Log and return
-                console.info(`[${res.status}] ${res.statusText}`);
-                return res.data;
-            })
-            .catch(err => {
-                throw new Error(this.GenerateErrorMsg(err));
-            })
+        return responseData;
     }
 
     /**
-     * Gets all products by online group
+     * Gets all products by online group (for OnlinegroupsOpen)
      * @param group The group to retrieve products for
      * @returns A Promise, which returns an array of Products
      */
-    getProductsByOnlineGroup(group: APIClient.OnlineGroup): Promise<APIClient.Product[]> {
+    async getProductsByOnlineGroup(group: API.OnlinegroupsOpen): Promise<API.GetProductsByOnlineGroup.Success> {
         let data = this.getBaseJSON({
             online_group: group.online_group,
             site_id: 0
         });
 
-        return this.instance.post("/bookings/getProductsByOnlineGroup", data)
-            .then(res => {
-                // Deconstruct response
-                let { Products }: { Products: APIClient.Product[] } = res.data;
+        let response = await this.instance.post(API.GetProductsByOnlineGroup.URL, data);
+        let responseData: API.GetProductsByOnlineGroup.Success = response.data;
 
-                // Log and return
-                console.info(`[${res.status}] ${res.statusText}`);
-                return res.data;
-            })
-            .catch(err => {
-                throw new Error(this.GenerateErrorMsg(err));
-            })
+        return responseData;
+    }
+
+    /**
+     * Gets all products by online group (for OnlineGroup)
+     * @param group The group to retrieve products for
+     * @returns 
+     */
+    async UniqueLocationsByOnlineGroup(group: API.Onlinegroup): Promise<API.UniqueLocationsByOnlineGroup.Success> {
+        let data = this.getBaseJSON({
+            onlinegroup: group.online_group
+        });
+
+        let response = await this.instance.post(API.UniqueLocationsByOnlineGroup.URL, data);
+        let responseData: API.UniqueLocationsByOnlineGroup.Success = response.data;
+
+        return responseData;
+    }
+
+    async schedule(group: API.Onlinegroup, site: string = "0"): Promise<API.Schedule.Success> {
+        let data = this.getBaseJSON({
+            trainer: "",
+            onlinegroup: group.online_group,
+            cmsid: "",
+            amount_of_days: 365,
+            site: site
+        });
+
+        let response = await this.instance.post(API.Schedule.URL, data);
+        let responseData: API.Schedule.Success = response.data;
+
+        return responseData;
     }
 
     /**
@@ -124,25 +153,13 @@ class APIClient {
      * @param product the product to retrieve the information for 
      * @returns A Promise, which returns the updated product with the additional information
      */
-    getProductById(product: APIClient.Product): Promise<APIClient.Product> {
+    async getProductById(product: API.Product): Promise<API.GetProductById.Success> {
         let data = this.getBaseJSON({ Product_id: product.Product_id });
 
-        return this.instance.post("/bookings/getProductById", data)
-            .then(res => {
-                // Deconstruct response
-                let { Product_exists, Product }: APIClient.ProductByIdResponse = res.data;
+        let response = await this.instance.post(API.GetProductById.URL, data);
+        let responseData: API.GetProductById.Success = response.data;
 
-                // Check if the product exists
-                if (!Product_exists)
-                    throw new Error(`[${res.status}] The product does not exist`);
-
-                // Log and return
-                console.info(`[${res.status}] ${res.statusText}`);
-                return Product;
-            })
-            .catch(err => {
-                throw new Error(this.GenerateErrorMsg(err));
-            })
+        return responseData;
     }
 
     /**
@@ -151,21 +168,13 @@ class APIClient {
      * @param date the date
      * @returns A Promise, which returns all available slots (and more info, please see interface AvailableSpotsResponse)
      */
-    getAvailableSlots(product: APIClient.Product, date: Date = new Date()): Promise<APIClient.AvailableSpotsResponse> {
+    async getAvailableSlots(product: API.Product, date: Date = new Date()): Promise<API.GetAvailableSlots.Success> {
         let data = this.getBaseJSON({ Product_id: product.Product_id, date: format(date, "D-MM-YYYY") });
 
-        return this.instance.post("/bookings/getAvailableSlots", data)
-            .then(res => {
-                // Deconstruct response
-                let { Message, Server_time, Empty_slots, Divided_slots, Prep_time, Dism_time, Slot_size, Slot_price, Min_participants, Online_tennis }: APIClient.AvailableSpotsResponse = res.data;
+        let response = await this.instance.post(API.GetAvailableSlots.URL, data);
+        let responseData: API.GetAvailableSlots.Success = response.data;
 
-                // Log and return
-                console.info(`[${res.status}] ${res.statusText}`);
-                return res.data;
-            })
-            .catch(err => {
-                throw new Error(this.GenerateErrorMsg(err));
-            })
+        return responseData;
     }
 
     /**
@@ -174,9 +183,9 @@ class APIClient {
      * @param product The product, to which the slot belongs to
      * @returns An empty promise
      */
-    addReservationBooking(slot: APIClient.Slot, product: APIClient.Product): Promise<void> {
+    async addReservationBooking(slot: API.EmptySlot, product: API.Product): Promise<API.AddReservationBooking.Success> {
         if (!product.Price)
-            throw new Error(`[internal] Reserving slot (${slot.Start_date}-${slot.End_date}) failed, the product did not have a price (${product.Price})`);
+            throw new Error(`[internal] Reserving slot (${slot.Start_date}-${slot.End_date}) failed, the product did not have a price (${product?.Price})`);
 
         let data = this.getBaseJSON({
             start_date: slot.Start_date,
@@ -185,62 +194,37 @@ class APIClient {
             price: product.Price
         });
 
+        let response = await this.instance.post(API.AddReservationBooking.URL, data);
+        let responseData: API.AddReservationBooking.Success = response.data;
 
-        return this.instance.post("/Bookings/AddReservationBooking", data)
-            .then(res => {
-                // Deconstruct response
-                let { response, message }: APIClient.DefaultResponse = res.data;
-
-                // Log and return
-                console.info(`[${res.status}] (${slot.Start_date}-${slot.End_date}) ${product.Description} ${message}`);
-                return res.data;
-            })
-            .catch(err => {
-                throw new Error(this.GenerateErrorMsg(err));
-            })
+        return responseData;
     }
 
     /**
      * Adds a booking to the account of the user
      * @param booking the booking to be added
-     * @returns A promise, which returns void ()
+     * @returns A promise, which returns the success message
      */
-    addBooking(booking: APIClient.Booking): Promise<void> {
-        let data = this.getBaseJSON({ booking_id: booking.booking_id });
+    async addBooking(booking: API.OpenGroupBooking): Promise<API.AddBooking.Success> {
+        let data = this.getBaseJSON({ booking_id: booking.Booking_id });
 
-        return this.instance.post("/bookings/addBooking", data)
-            .then(res => {
-                // Deconstruct response
-                let { response, message } = res.data;
+        let response = await this.instance.post(API.AddBooking.URL, data);
+        let responseData: API.AddBooking.Success = response.data;
 
-                // Log and return
-                console.info(`[${res.status}] ${message}`);
-                return;
-            })
-            .catch(err => {
-                throw new Error(this.GenerateErrorMsg(err));
-            })
+        return responseData;
     }
 
     /**
      * Retrieves all bookings of the customer
      * @returns an array of Booking, representing each booking of the user
      */
-    myBookings(): Promise<APIClient.Booking[]> {
+    async myBookings(): Promise<API.MyBookings.Success> {
         let data = this.getBaseJSON();
 
-        return this.instance.post("/bookings/myBookings", data)
-            .then(res => {
-                // Deconstruct response
-                let { response, message, mybookings } = res.data;
+        let response = await this.instance.post(API.MyBookings.URL, data);
+        let responseData: API.MyBookings.Success = response.data;
 
-                // Log and return
-                console.info(`[${res.status}] ${message}`);
-                return mybookings;
-            })
-            .catch(err => {
-                throw new Error(this.GenerateErrorMsg(err));
-            })
+        return responseData;
     }
 
     /**
@@ -248,73 +232,69 @@ class APIClient {
      * @param booking the booking to be canceled
      * @returns The response from the server (0 for no error)
      */
-    async cancelBooking(booking: APIClient.Booking): number {
-        let req = this.getBaseJSON({ booking_id: booking.booking_id });
+    async cancelBooking(booking: API.Booking): Promise<API.CancelReservationBooking.Success> {
+        let data = this.getBaseJSON({ booking_id: booking.booking_id });
 
-        let { response, message, mybookings } = (await (this.instance.post("/bookings/cancelBooking", req))).data
+        let response = await this.instance.post(API.MyBookings.URL, data);
+        let responseData: API.MyBookings.Success = response.data;
 
-        return this.instance.post("/bookings/cancelBooking", data)
-            .then(res => {
-                // Deconstruct response
-                let { response, message, mybookings } = res.data;
-
-                // Log and return
-                console.info(`[${res.status}] ${message}`);
-                return;
-            })
-            .catch(err => {
-                throw new Error(this.GenerateErrorMsg(err));
-            })
+        return responseData;
     }
 
     /**
-     * A simple way of logging errors from Axios requests, which did not recieve a response
-     * @param err the error which was recieved from Axios
+     * Books a spot for an Online Group
+     * @param groupName the name of the Online Group
+     * @param targetDay the day, which is targeted
+     * @param startTime the start time of the slot
+     * @returns the booking, which should be booked
      */
-    protected axiosErrorMsg(err: any): string {
-        let axiosMessage = err.message;
+    async reserveOnlineGroup(groupName: string, targetDay: string, startTime: string): Promise<API.OpenGroupBooking> {
+        // Grab the group with the group name
+        let group = await this.findonlineGroup(groupName);
+        // Retrieve the booking
+        let booking = (await this.schedule(group))
+            .schedule.find(({ day }) => day === targetDay)
+            ?.bookings.find(({ Start_time }) => Start_time === startTime);
 
-        throw new Error(`Axios Error: ${axiosMessage}`);
+        // Check if there was such a booking
+        if(!booking)
+            throw new Error(`Booking with name ${groupName}, at day ${targetDay} and start time ${startTime} did not exist`);
+
+        await api.addBooking(booking);
+        await api.checkOpenGroupBooking(booking);
+        return booking;
     }
 
     /**
-     * A simple way of logging errors from Axios requests, which did recieve a response
-     * @param err the error which was recieved from Axios
-     * @param apiError the API error, which was inside the Axios error
+     * Finds an Onlinegroup from the online_group array with a given name
+     * @param groupName the name of the group
+     * @returns the online group that was found
+     * @throws an error if the group does not exist
      */
-    protected APIErrorMsg(err: any, apiError: APIClient.DefaultErrorResponse): string {
-        let axiosMessage = err.message;
-
-        throw new Error(`[${apiError.code}] API Error: ${apiError.error.message} (Axios Message: ${axiosMessage})`);
-
+    async findonlineGroup(groupName: string): Promise<API.Onlinegroup> {
+        // Retrieve online groups
+        let onlineGroups: API.OnlineGroups.Success = await api.onlineGroups();
+        // Retrieve Unique location per online group
+        let group = onlineGroups.onlinegroups.find(({ online_group }) => online_group === groupName);
+        // Check if the group exists
+        if (!group)
+            throw new Error(`The group with name ${groupName} does not exist`);
+        // Return group
+        return group
     }
 
-    /**
-     * A function wrapper for APIError or AxiosError
-     * @param err The error from Axios
-     * @returns The error message
-     */
-    protected GenerateErrorMsg(err: any): string {
-        return (err.response) ? this.APIErrorMsg(err, err.response.data) : this.axiosErrorMsg(err);
+    async checkOpenGroupBooking(booking: API.OpenGroupBooking): Promise<boolean> {
+        let myBookings = await api.myBookings();
+        return myBookings.mybookings.findIndex(({booking_id}) => booking_id === booking.Booking_id) >= 1;
     }
 }
 
 let api = new APIClient(sensitiveData.customer_id, sensitiveData.license, sensitiveData.token);
 
-api.checkVersion()
-    .catch(err => {
-        if (err)
-            console.log(err);
-    })
-    .then(() => api.onlineGroups())
-    .catch(err => {
-        if (err)
-            console.log(err);
-    })
-    .then(groups => {
-        console.log(JSON.stringify(groups));
-    })
-    .catch(err => {
-        if (err)
-            console.log(err);
-    })
+api.reserveOnlineGroup("Fitness Time-Slots", "19-11-2021", "10:00").then( booking => {
+    api.checkOpenGroupBooking(booking);
+}).then(() => {
+    console.log("Booking complete!");
+}).catch((erer) => {
+    console.log(erer);
+})

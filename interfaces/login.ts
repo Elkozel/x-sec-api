@@ -1,6 +1,6 @@
 import { DefaultErrorResponse, DefaultRequest, DefaultSuccessResponse, User } from "./defaults";
 
-var URL: string = "";
+var URL: string = "/users/login";
 export { URL };
 
 export interface Request extends DefaultRequest {
