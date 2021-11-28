@@ -1,4 +1,4 @@
-import { DefaultRequest, DefaultErrorResponse, DefaultSuccessResponse, Schedule } from "./defaults";
+import { DefaultRequest, DefaultErrorResponse, DefaultSuccessResponse } from "./defaults";
 
 var URL: string = "/bookings/addBooking";
 export { URL };

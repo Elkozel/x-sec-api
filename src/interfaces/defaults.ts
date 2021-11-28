@@ -120,7 +120,7 @@ export interface Uniquelocationsbyonlinegroup {
     description: string;
 }
 
-export interface Schedule {
+export interface schedule {
     day: string;
     bookings: OpenGroupBooking[];
 }

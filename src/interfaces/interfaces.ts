@@ -1,4 +1,3 @@
-import { APIRequest, APIResponse } from "./defaults";
 
 /**
  * Namespace for useless interfaces

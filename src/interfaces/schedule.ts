@@ -1,4 +1,4 @@
-import { DefaultRequest, DefaultErrorResponse, DefaultSuccessResponse, Schedule } from "./defaults";
+import { DefaultRequest, DefaultErrorResponse, DefaultSuccessResponse, schedule } from "./defaults";
 
 var URL: string = "/bookings/schedule";
 export { URL };
@@ -12,7 +12,7 @@ export interface Request extends DefaultRequest {
 };
 
 export interface Success extends DefaultSuccessResponse {
-    schedule: Schedule[];
+    schedule: schedule[];
 };
 
 export interface Failure extends DefaultErrorResponse { };
