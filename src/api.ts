@@ -172,7 +172,7 @@ export class APIInstance {
     async getAvailableSlots(product: Procedures.Product, date: Date = new Date()): Promise<Procedures.GetAvailableSlots.Success> {
         let data = this.getBaseJSON<Procedures.GetAvailableSlots.Request>({
             Product_id: product.Product_id,
-            date: format(date, "D-MM-YYYY")
+            date: format(date, "DD-MM-YYYY")
         });
 
         let response = await this.instance.post<Procedures.GetAvailableSlots.Success>(Procedures.GetAvailableSlots.URL, data);
