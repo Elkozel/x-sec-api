@@ -1,34 +1,45 @@
-import * as fs from "fs";
-import { format } from 'date-and-time';
+import { default as dayjs } from 'dayjs';
 import { APIInstance } from "./api";
 import * as Procedures from "./interfaces/interfaces";
 
-const sensitiveData = JSON.parse(fs.readFileSync("data/sensitive.json", "UTF-8"));
-
-const DEFAULT_URL: string = sensitiveData.URL;
-
+/**
+ * Extends on the Unique Locations per Online Group
+ * @param schedule an object, where each key is the day of the schedule (in the format DD-MM-YYYY)
+ */
 interface UniqueLocations extends Procedures.Uniquelocationsbyonlinegroup {
-    schedule?: Procedures.schedule[],
+    schedule?: { [key: string]: Procedures.schedule };
 }
 
+/**
+ * Extends on the Online Group
+ * @param uniqueLocations an object, where each key is the description of the unique location
+ */
 interface OnlineGroup extends Procedures.Onlinegroup {
-    uniqueLocations?: UniqueLocations[]
+    uniqueLocations?: { [key: string]: UniqueLocations }
 }
 
+/**
+ * Extends each product
+ * @param availableSlots an object, where each key is the start time of the empty slot (in format YYYY-MM-DD hh:mm)
+ */
 interface Product extends Procedures.Product {
-    availableSlots?: { [key: string]: Procedures.EmptySlot[] };
+    availableSlots?: { [key: string]: Procedures.EmptySlot };
 }
 
+/**
+ * Extends on the OnlineGroupOpen
+ * @param products an object, where each key is the description of the product
+ */
 interface OnlineGroupOpen extends Procedures.OnlinegroupsOpen {
-    products?: Product[];
+    products?: { [key: string]: Product };
 }
 
 interface APIInfo {
     version?: string,
     userInfo?: Procedures.User,
-    onlineGroups?: OnlineGroup[],
-    onlineGroupsOpen?: Procedures.OnlinegroupsOpen[],
-    bookings?: Procedures.Booking[]
+    onlineGroups: { [k: string]: OnlineGroup },
+    onlineGroupsOpen: { [k: string]: OnlineGroupOpen },
+    bookings?: { [k: string]: Procedures.Booking}
 }
 
 enum GroupResponse {
@@ -37,10 +48,14 @@ enum GroupResponse {
 }
 
 export class APIClient {
-    protected info: APIInfo = {}; // Information, retrieved from the API
+    protected info: APIInfo = { // Information, retrieved from the API
+        onlineGroups: {},
+        onlineGroupsOpen: {}
+    };
     protected api: APIInstance; // The API instance used to issue the calls
+    private initialized = false;
 
-    constructor(customer_id: string, license: string, token: string, URL: string = DEFAULT_URL) {
+    constructor(customer_id: string, license: string, token: string, URL: string) {
         this.api = new APIInstance(customer_id, license, token, URL);
     }
 
@@ -56,11 +71,31 @@ export class APIClient {
 
         // Retrieve online groups
         let groups = await this.api.onlineGroups();
-        this.info.onlineGroups = groups.onlinegroups;
-        this.info.onlineGroupsOpen = groups.onlinegroups_open;
+
+        // Initialize groups object
+        this.info.onlineGroups = {};
+        this.info.onlineGroupsOpen = {};
+
+        // Store all groups
+        groups.onlinegroups.forEach(group => {
+            this.info.onlineGroups[group.online_group] = group;
+        })
+
+        groups.onlinegroups_open.forEach(groupOpen => {
+            this.info.onlineGroupsOpen[groupOpen.online_group] = groupOpen;
+        })
 
         // Retrieve bookings
-        this.info.bookings = await (await this.api.myBookings()).mybookings;
+        this.info.bookings = {};
+        let allBookings = await this.api.myBookings();
+
+        // Store the bookings
+        allBookings.mybookings.forEach(el => {
+            this.info.bookings![el.booking_id] = el;
+        })
+
+        // Record that the class was initialized
+        this.initialized = true;
     }
 
     /**
@@ -70,17 +105,15 @@ export class APIClient {
      * @throws an error if the name is not found in both groups
      */
     async resolveGroup(groupName: string): Promise<GroupResponse> {
-        if (!this.info.onlineGroups || !this.info.onlineGroupsOpen)
+        if (!this.initialized)
             await this.init();
 
         // Check onlineGroups
-        let searchClosed = this.info.onlineGroups?.find(({ online_group }) => { online_group === groupName });
-        if (searchClosed)
+        if (groupName in this.info.onlineGroups)
             return GroupResponse.OnlineGroup;
 
         // Check onlineGroupsOpen
-        let searchOpen = this.info.onlineGroupsOpen?.find(({ online_group }) => { online_group === groupName });
-        if (searchOpen)
+        if (groupName in this.info.onlineGroupsOpen)
             return GroupResponse.OnlineGoup_Open;
 
         // Else return an error
@@ -116,20 +149,46 @@ export class APIClient {
      * @param startTime the start time of the slot
      * @returns the booking, which should be booked
      */
-    async reserveOnlineGroup(groupName: string, date: Date, site_ID: number = 0, schedule_ID: number = 0): Promise<Procedures.OpenGroupBooking> {
+    async reserveOnlineGroup(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<Procedures.OpenGroupBooking> {
         // Retrieve the group
-        let onlineGroup = await this.findOnlineGroup(groupName);
+        let onlineGroup = this.info.onlineGroups[groupName];
 
-        // Gather all info
-        onlineGroup.uniqueLocations = await (await this.api.UniqueLocationsByOnlineGroup(onlineGroup)).uniquelocationsbyonlinegroup;
-        let location = onlineGroup.uniqueLocations.find(({ site_id }) => parseInt(site_id) === site_ID);
+        if (!onlineGroup)
+            throw new Error(`Online group with name ${groupName} could not be found`)
+
+        // Gather all locations of this group (if not gathered before)
+        if (!onlineGroup.uniqueLocations) {
+            // Initialize object
+            onlineGroup.uniqueLocations = {};
+            // Retrieve all locations
+            let allLocations = await this.api.UniqueLocationsByOnlineGroup(onlineGroup);
+            // Store all locations
+            allLocations.uniquelocationsbyonlinegroup.forEach(el => {
+                onlineGroup.uniqueLocations![el.description] = el; // Typescript was complaining that this could be undefined
+            })
+        }
+
+        // Get the location
+        let location = onlineGroup.uniqueLocations[site_description];
         if (!location)
-            throw new Error(`Error, the group ${groupName} does not have a site id ${site_ID}`);
-        location.schedule = await (await this.api.schedule(onlineGroup, location.site_id)).schedule;
+            throw new Error(`Error, the group ${groupName} does not have a site ${site_description}`);
 
-        let targetDay = format(date, "DD-MM-YYYY");
-        let daySchedule = location.schedule.find(({ day }) => day === targetDay);
-        let booking = daySchedule?.bookings.find(({ Start_time }) => new Date(Start_time) === date);
+        // Retrieve the schedule (as the schedule is highly dynamic, this will always be refreshed)
+        let schedule = await this.api.schedule(onlineGroup, location.site_id);
+        // Store the schedule
+        location.schedule = {};
+        schedule.schedule.forEach(el => {
+            location.schedule![el.day] = el;
+        });
+
+        // Find the booking
+        let targetDay = dayjs(date).format("DD-MM-YYYY")
+        console.log(targetDay);
+        let daySchedule = location.schedule[targetDay];
+        if (!daySchedule)
+            throw new Error(`The day ${targetDay} could not be found in the schedule of ${groupName} at site ${site_description}`);
+        console.log(daySchedule);
+        let booking = daySchedule.bookings.find(({ Start_date }) => new Date(Start_date).getDate() === date.getDate());
 
         // Check if there was such a booking
         if (!booking)
@@ -142,76 +201,56 @@ export class APIClient {
 
     /**
      * Creates a reservation for an Online Group Open
-     * @param group The name of the group
+     * @param groupName The name of the group
      * @param description The description of the group
      * @param start_date the start date of the slot
      * @param date the date for which the slot belongs
      * @returns the booking id of the newly created booking
      */
-    async reserveOnlineGroupOpen(group: string, description: string, date: Date = new Date()): Promise<number> {
+    async reserveOnlineGroupOpen(groupName: string, description: string, date: Date = new Date()): Promise<number> {
         // Retrieve the online group
-        let onlineGroupOpen = await this.findOnlineGroupOpen(group);
+        let onlineGroupOpen = this.info.onlineGroupsOpen[groupName];
 
-        // Gather all info (with some detailed explanation)
-        let allProducts = await (await this.api.getProductsByOnlineGroup(onlineGroupOpen)).Products; // Get all products (the API only returns a description and an ID)
-        let resolvedProducts = await Promise.all(allProducts.map(prod => this.api.getProductById(prod))) // Get the full information for each product
-        onlineGroupOpen.products = resolvedProducts.map(prod => prod.Product); // Extract only the products from the responses
+        if (!onlineGroupOpen.products) {
+            onlineGroupOpen.products = {};
+            // Gather all info (with some detailed explanation)
+            let allProducts = await (await this.api.getProductsByOnlineGroup(onlineGroupOpen)).Products; // Get all products (the API only returns a description and an ID)
+            let resolvedProducts = await Promise.all(allProducts.map(prod => this.api.getProductById(prod))) // Get the full information for each product
+            resolvedProducts.forEach(el => {
+                onlineGroupOpen.products![el.Product.Description] = el.Product; // store each product
+            })
+        }
 
-        let targetProduct = onlineGroupOpen.products.find(({ Description }) => { Description === description });
+        let targetProduct = onlineGroupOpen.products[description];
         if (!targetProduct)
-            throw new Error(`Booking with name ${group}, and description ${description} does not exist`);
+            throw new Error(`Booking with name ${groupName}, and description ${description} does not exist`);
 
+        // Retrieve the available slots (as the schedule is highly dynamic, this will always be refreshed)
+        let retrieveSlots = await this.api.getAvailableSlots(targetProduct, date);
         targetProduct.availableSlots = {};
-        targetProduct.availableSlots[date.toString()] = await (await this.api.getAvailableSlots(targetProduct, date)).Empty_slots;
+        // Store available slots
+        retrieveSlots.Empty_slots.forEach(el => {
+            targetProduct.availableSlots![el.Start_date] = el;
+        })
 
-        let emptySlot = targetProduct.availableSlots[date.toString()].find(({ Start_date }) => new Date(Start_date).getTime() === date.getTime());
+        let targetStartTime = dayjs(date).format("YYYY-MM-DD HH:mm");
+        let emptySlot = targetProduct.availableSlots[targetStartTime];
         if (!emptySlot)
-            throw new Error(`Spot with name ${group}, and description ${description} at time ${date.toString()} does not exist`);
+            throw new Error(`Spot with name ${groupName}, and description ${description} at time ${date.toString()} does not exist`);
 
         return await (await this.api.addReservationBooking(emptySlot, targetProduct)).booking_id;
     }
 
     /**
-     * Finds an Onlinegroup from the online_group array with a given name
-     * @param groupName the name of the group
-     * @returns the online group that was found
-     * @throws an error if the group does not exist
+     * Updates the bookings that the user has
      */
-    async findOnlineGroup(groupName: string): Promise<OnlineGroup> {
-        // Retrieve groups if not retrieved
-        if (!this.info.onlineGroups)
-            await this.init();
+    async updateBookings(): Promise<void> {
+        this.info.bookings = {};
+        let allBookings = await this.api.myBookings();
 
-        // Get list of online groups
-        let onlineGroups = this.info.onlineGroups;
-        // Retrieve Unique location per online group
-        let group = onlineGroups?.find(({ online_group }) => online_group === groupName);
-        // Check if the group exists
-        if (!group)
-            throw new Error(`The group with name ${groupName} does not exist`);
-        // Return group
-        return group;
-    }
-
-    /**
-     * Retrieves an online group from memory
-     * @param groupName the name of the Group
-     * @returns The group found
-     */
-    async findOnlineGroupOpen(groupName: string): Promise<OnlineGroupOpen> {
-        // Retrieve groups if not retrieved
-        if (!this.info.onlineGroups)
-            await this.init();
-
-        // Get list of online groups
-        let onlineGroupsOpen = this.info.onlineGroupsOpen;
-        // Retrieve Unique location per online group
-        let group = onlineGroupsOpen?.find(({ online_group }) => online_group === groupName);
-        // Check if the group exists
-        if (!group)
-            throw new Error(`The group with name ${groupName} does not exist`);
-        // Return group
-        return group;
+        allBookings.mybookings.forEach(el => {
+            this.info.bookings![el.booking_id] = el;
+        })
     }
 
     /**
@@ -221,9 +260,9 @@ export class APIClient {
      */
     async findBooking(booking_ID: number): Promise<Procedures.Booking> {
         // Update bookings
-        this.info.bookings = (await this.api.myBookings()).mybookings;
+        await this.updateBookings();
         // Retrieve the booking
-        let booking = this.info.bookings.find(({ booking_id }) => { booking_ID === parseInt(booking_id) });
+        let booking = this.info.bookings![booking_ID];
         // Check if the booking exists
         if (!booking)
             throw new Error(`Could not find booking number ${booking_ID}`);
@@ -237,15 +276,17 @@ export class APIClient {
      * @returns true, if the booking was found
      */
     async checkOpenGroupBooking(bookingNumber: number): Promise<boolean> {
-        this.info.bookings = await (await this.api.myBookings()).mybookings;
-        return this.info.bookings.findIndex(({ booking_id }) => parseInt(booking_id) == bookingNumber) >= 1;
+        await this.updateBookings();
+        if(this.info.bookings![bookingNumber])
+            return true;
+        return false;
     }
 
-    /**
-     * Getter function for the information, which this client has
-     * @returns all the stored information of the client
-     */
-    get apiInfo() {
-        return this.info;
-    }
+    // /**
+    //  * Getter function for the information, which this client has
+    //  * @returns all the stored information of the client
+    //  */
+    // get apiInfo() {
+    //     return this.info;
+    // }
 }

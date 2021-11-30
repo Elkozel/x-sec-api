@@ -1,7 +1,5 @@
 /node_modules
 /package-lock.json
-/*.js
-/out/*
 data/sensitive.json
-/data
-interfaces/*.js
+/build
+.vscode/

@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from "axios";
-import { format } from 'date-and-time';
+import { default as dayjs } from 'dayjs';
 import * as Procedures from "./interfaces/interfaces";
 
 export class APIInstance {
@@ -71,7 +71,7 @@ export class APIInstance {
             pushid: "AppPushID"
         });
 
-        let response = await this.instance.post<Procedures.Login.Success>(Procedures.GetProductsByOnlineGroup.URL, data);
+        let response = await this.instance.post<Procedures.Login.Success>(Procedures.Login.URL, data);
         let responseData = response.data;
 
         return responseData;
@@ -82,13 +82,10 @@ export class APIInstance {
      * @returns all online groups
      */
     async onlineGroups(): Promise<Procedures.OnlineGroups.Success> {
-        let data = this.getBaseJSON<Procedures.OnlineGroups.Request>({
-            remember: false,
-            pushid: "AppPushID"
-        });
+        let data = this.getBaseJSON<Procedures.OnlineGroups.Request>();
 
 
-        let response = await this.instance.post<Procedures.OnlineGroups.Success>(Procedures.GetProductsByOnlineGroup.URL, data);
+        let response = await this.instance.post<Procedures.OnlineGroups.Success>(Procedures.OnlineGroups.URL, data);
         let responseData = response.data;
 
         return responseData;
@@ -171,8 +168,8 @@ export class APIInstance {
      */
     async getAvailableSlots(product: Procedures.Product, date: Date = new Date()): Promise<Procedures.GetAvailableSlots.Success> {
         let data = this.getBaseJSON<Procedures.GetAvailableSlots.Request>({
-            Product_id: product.Product_id,
-            date: format(date, "DD-MM-YYYY")
+            product_id: product.Product_id,
+            date: dayjs(date).format("D-MM-YYYY")
         });
 
         let response = await this.instance.post<Procedures.GetAvailableSlots.Success>(Procedures.GetAvailableSlots.URL, data);
