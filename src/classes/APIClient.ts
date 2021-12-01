@@ -1,6 +1,6 @@
 import { default as dayjs } from 'dayjs';
-import { APIInstance } from "./api";
-import * as Procedures from "./interfaces/interfaces";
+import { APIInstance } from "./APIInstance";
+import * as Procedures from "../interfaces/interfaces";
 
 /**
  * Extends on the Unique Locations per Online Group

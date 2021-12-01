@@ -1,6 +1,6 @@
 import axios, { AxiosInstance } from "axios";
 import { default as dayjs } from 'dayjs';
-import * as Procedures from "./interfaces/interfaces";
+import * as Procedures from "../interfaces/interfaces";
 
 export class APIInstance {
     protected readonly customer_id: string;
