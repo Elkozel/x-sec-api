@@ -115,7 +115,7 @@ export class APIInstance {
      * @returns 
      */
     async UniqueLocationsByOnlineGroup(group: Procedures.Onlinegroup): Promise<Procedures.UniqueLocationsByOnlineGroup.Success> {
-        let data = this.getBaseJSON({
+        let data = this.getBaseJSON<Procedures.UniqueLocationsByOnlineGroup.Request>({
             onlinegroup: group.online_group
         });
 
@@ -152,7 +152,7 @@ export class APIInstance {
      * @returns A Promise, which returns the updated product with the additional information
      */
     async getProductById(product: Procedures.Product): Promise<Procedures.GetProductById.Success> {
-        let data = this.getBaseJSON({ Product_id: product.Product_id });
+        let data = this.getBaseJSON<Procedures.GetProductById.Request>({ Product_id: product.Product_id });
 
         let response = await this.instance.post<Procedures.GetProductById.Success>(Procedures.GetProductById.URL, data);
         let responseData = response.data;
@@ -188,7 +188,7 @@ export class APIInstance {
         if (!product.Price)
             throw new Error(`[internal] Reserving slot (${slot.Start_date}-${slot.End_date}) failed, the product did not have a price (${product?.Price})`);
 
-        let data = this.getBaseJSON({
+        let data = this.getBaseJSON<Procedures.AddReservationBooking.Request>({
             start_date: slot.Start_date,
             end_date: slot.End_date,
             product_id: product.Product_id,
@@ -207,7 +207,7 @@ export class APIInstance {
      * @returns A promise, which returns the success message
      */
     async addBooking(booking: Procedures.OpenGroupBooking): Promise<Procedures.AddBooking.Success> {
-        let data = this.getBaseJSON({
+        let data = this.getBaseJSON<Procedures.AddBooking.Request>({
             booking_id: booking.Booking_id
         });
 
