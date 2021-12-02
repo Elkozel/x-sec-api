@@ -1,2 +1,2 @@
 export { APIClient } from "./classes/APIClient";
- export { APIInstance } from "./classes/APIInstance";
+export { APIInstance } from "./classes/APIInstance";

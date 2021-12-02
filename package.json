@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "compile": "tsc",
-    "start": "tsc && node build/api.js",
+    "start": "tsc && node build/index.js",
     "test": "echo \"Yeah, no tests, sorry Andy :(\""
   },
   "keywords": [
