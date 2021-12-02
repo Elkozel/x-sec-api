@@ -26,6 +26,7 @@
     "date-and-time": "^2.0.1",
     "dateformat": "^5.0.2",
     "dayjs": "^1.10.7",
-    "fs": "^0.0.1-security"
+    "fs": "^0.0.1-security",
+    "pino": "^7.5.1"
   }
 }
