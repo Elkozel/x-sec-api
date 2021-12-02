@@ -1,6 +1,11 @@
 import { default as dayjs } from 'dayjs';
 import { APIInstance } from "./APIInstance";
 import * as Procedures from "../interfaces/interfaces";
+import pino from "pino";
+const logger = pino({
+    name: "API Client"
+})
+
 
 /**
  * Extends on the Unique Locations per Online Group
@@ -34,14 +39,25 @@ interface OnlineGroupOpen extends Procedures.OnlinegroupsOpen {
     products?: { [key: string]: Product };
 }
 
+/**
+ * Object, which store the information that the API has
+ */
 interface APIInfo {
+    // The version of the API
     version?: string,
+    // The info about the user
     userInfo?: Procedures.User,
+    // All online groups
     onlineGroups: { [k: string]: OnlineGroup },
+    // All online groups Open
     onlineGroupsOpen: { [k: string]: OnlineGroupOpen },
+    // All bookings
     bookings?: { [k: string]: Procedures.Booking}
 }
 
+/**
+ * Response from deriving if a group belongs to Online Groups or Online Groups Open
+ */
 enum GroupResponse {
     OnlineGroup,
     OnlineGoup_Open
@@ -63,6 +79,8 @@ export class APIClient {
      * Requests basic information from the API, checks the user and the version of the API
      */
     async init(): Promise<void> {
+        logger.info(`Initializing API Client`);
+
         this.api.checkVersion();
 
         // Retrieve login information about the user
@@ -96,6 +114,7 @@ export class APIClient {
 
         // Record that the class was initialized
         this.initialized = true;
+        logger.debug(`API Client was initialized`);
     }
 
     /**
@@ -105,8 +124,11 @@ export class APIClient {
      * @throws an error if the name is not found in both groups
      */
     async resolveGroup(groupName: string): Promise<GroupResponse> {
-        if (!this.initialized)
+        // Check if initialized
+        if (!this.initialized){
+            logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
             await this.init();
+        }
 
         // Check onlineGroups
         if (groupName in this.info.onlineGroups)
@@ -123,6 +145,12 @@ export class APIClient {
 
 
     async reserve(groupName: string, date: string | Date, description?: string): Promise<Procedures.Booking> {
+        // Check if initialized
+        if (!this.initialized){
+            logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
+            await this.init();
+        }
+
         if (typeof date === "string") // Handle if Date is a string
             date = new Date(date);
 
@@ -150,6 +178,12 @@ export class APIClient {
      * @returns the booking, which should be booked
      */
     async reserveOnlineGroup(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<Procedures.OpenGroupBooking> {
+        // Check if initialized
+        if (!this.initialized){
+            logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
+            await this.init();
+        }
+        
         // Retrieve the group
         let onlineGroup = this.info.onlineGroups[groupName];
 
@@ -208,6 +242,12 @@ export class APIClient {
      * @returns the booking id of the newly created booking
      */
     async reserveOnlineGroupOpen(groupName: string, description: string, date: Date = new Date()): Promise<number> {
+        // Check if initialized
+        if (!this.initialized){
+            logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
+            await this.init();
+        }
+
         // Retrieve the online group
         let onlineGroupOpen = this.info.onlineGroupsOpen[groupName];
 
@@ -281,12 +321,4 @@ export class APIClient {
             return true;
         return false;
     }
-
-    // /**
-    //  * Getter function for the information, which this client has
-    //  * @returns all the stored information of the client
-    //  */
-    // get apiInfo() {
-    //     return this.info;
-    // }
 }

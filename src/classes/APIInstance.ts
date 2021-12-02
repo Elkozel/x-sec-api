@@ -220,7 +220,7 @@ export class APIInstance {
      */
     async addReservationBooking(slot: Procedures.EmptySlot, product: Procedures.Product): Promise<Procedures.AddReservationBooking.Success> {
         if (!product.Price)
-            throw new Error(`[internal] Reserving slot (${slot.Start_date}-${slot.End_date}) failed, the product did not have a price (${product?.Price})`);
+            throw new Error(`Reserving slot (${slot.Start_date}-${slot.End_date}) failed, the product did not have a price (${product?.Price}) (Maybe call getProductById first?)`);
 
         let data = this.getBaseJSON<Procedures.AddReservationBooking.Request>({
             start_date: slot.Start_date,
@@ -230,6 +230,9 @@ export class APIInstance {
         });
 
         logger.debug({ slot: slot, product: product }, `Reservation booking was requested (Online Group)`);
+
+        if(parseInt(data.price) > 0)
+            logger.warn({ slot: slot, product: product }, `A product with the price of ${product.Price} was added to the basket`);
 
         let response = await this.instance.post<Procedures.AddReservationBooking.Success>(Procedures.AddReservationBooking.URL, data);
         let responseData = response.data;
