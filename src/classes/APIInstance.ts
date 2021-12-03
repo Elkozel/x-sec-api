@@ -1,6 +1,10 @@
 import axios, { AxiosInstance } from "axios";
 import { default as dayjs } from 'dayjs';
-import * as Procedures from "./interfaces/interfaces";
+import * as Procedures from "../interfaces/interfaces";
+import pino from "pino";
+const logger = pino({
+    name: "API"
+})
 
 export class APIInstance {
     protected readonly customer_id: string;
@@ -27,6 +31,8 @@ export class APIInstance {
         this.instance = axios.create({
             baseURL: URL
         });
+
+        logger.debug(`An API instance was initiated for URL ${URL}`);
     }
 
     /**
@@ -55,6 +61,8 @@ export class APIInstance {
             version: this.version
         }
 
+        logger.debug("A version check was issued");
+
         let response = await this.instance.post<Procedures.CheckVersion.Success>(Procedures.CheckVersion.URL, data);
         let responseData = response.data;
 
@@ -71,8 +79,12 @@ export class APIInstance {
             pushid: "AppPushID"
         });
 
+        logger.debug("A login is attempted");
+
         let response = await this.instance.post<Procedures.Login.Success>(Procedures.Login.URL, data);
         let responseData = response.data;
+
+        logger.debug(`User ${responseData.user.first_name} ${responseData.user.last_name} was successfully logged in`);
 
         return responseData;
     }
@@ -84,6 +96,7 @@ export class APIInstance {
     async onlineGroups(): Promise<Procedures.OnlineGroups.Success> {
         let data = this.getBaseJSON<Procedures.OnlineGroups.Request>();
 
+        logger.debug("Retrieving Online Groups");
 
         let response = await this.instance.post<Procedures.OnlineGroups.Success>(Procedures.OnlineGroups.URL, data);
         let responseData = response.data;
@@ -103,8 +116,12 @@ export class APIInstance {
             site_id: site_id
         });
 
+        logger.debug(`Products for online group ${group} at site ${site_id} were requested`);
+
         let response = await this.instance.post<Procedures.GetProductsByOnlineGroup.Success>(Procedures.GetProductsByOnlineGroup.URL, data);
         let responseData = response.data;
+
+        logger.debug(`${responseData.Products.length} Products were retrieved`);
 
         return responseData;
     }
@@ -115,12 +132,16 @@ export class APIInstance {
      * @returns 
      */
     async UniqueLocationsByOnlineGroup(group: Procedures.Onlinegroup): Promise<Procedures.UniqueLocationsByOnlineGroup.Success> {
-        let data = this.getBaseJSON({
+        let data = this.getBaseJSON<Procedures.UniqueLocationsByOnlineGroup.Request>({
             onlinegroup: group.online_group
         });
 
+        logger.debug(`Unique locations for online group ${group} were requested`);
+
         let response = await this.instance.post(Procedures.UniqueLocationsByOnlineGroup.URL, data);
         let responseData: Procedures.UniqueLocationsByOnlineGroup.Success = response.data;
+
+        logger.debug(responseData.message);
 
         return responseData;
     }
@@ -140,8 +161,12 @@ export class APIInstance {
             site: site
         });
 
+        logger.debug(`Schedule for online group ${group} was requested`);
+
         let response = await this.instance.post<Procedures.Schedule.Success>(Procedures.Schedule.URL, data);
         let responseData = response.data;
+
+        logger.debug(responseData.message);
 
         return responseData;
     }
@@ -152,10 +177,15 @@ export class APIInstance {
      * @returns A Promise, which returns the updated product with the additional information
      */
     async getProductById(product: Procedures.Product): Promise<Procedures.GetProductById.Success> {
-        let data = this.getBaseJSON({ Product_id: product.Product_id });
+        let data = this.getBaseJSON<Procedures.GetProductById.Request>({ Product_id: product.Product_id });
+
+        logger.debug(`Further information for product ${product.Description} was requested`);
 
         let response = await this.instance.post<Procedures.GetProductById.Success>(Procedures.GetProductById.URL, data);
         let responseData = response.data;
+
+        if (!responseData.Product_exists)
+            logger.warn({ reqProduct: product, res: responseData }, `A product which does not exist was requested`);
 
         return responseData;
     }
@@ -172,8 +202,12 @@ export class APIInstance {
             date: dayjs(date).format("D-MM-YYYY")
         });
 
+        logger.debug(`Available slots for product ${product.Description} (${date.toString()}) was requested`);
+
         let response = await this.instance.post<Procedures.GetAvailableSlots.Success>(Procedures.GetAvailableSlots.URL, data);
         let responseData = response.data;
+
+        logger.debug(responseData.Message);
 
         return responseData;
     }
@@ -186,17 +220,24 @@ export class APIInstance {
      */
     async addReservationBooking(slot: Procedures.EmptySlot, product: Procedures.Product): Promise<Procedures.AddReservationBooking.Success> {
         if (!product.Price)
-            throw new Error(`[internal] Reserving slot (${slot.Start_date}-${slot.End_date}) failed, the product did not have a price (${product?.Price})`);
+            throw new Error(`Reserving slot (${slot.Start_date}-${slot.End_date}) failed, the product did not have a price (${product?.Price}) (Maybe call getProductById first?)`);
 
-        let data = this.getBaseJSON({
+        let data = this.getBaseJSON<Procedures.AddReservationBooking.Request>({
             start_date: slot.Start_date,
             end_date: slot.End_date,
             product_id: product.Product_id,
             price: product.Price
         });
 
+        logger.debug({ slot: slot, product: product }, `Reservation booking was requested (Online Group)`);
+
+        if(parseInt(data.price) > 0)
+            logger.warn({ slot: slot, product: product }, `A product with the price of ${product.Price} was added to the basket`);
+
         let response = await this.instance.post<Procedures.AddReservationBooking.Success>(Procedures.AddReservationBooking.URL, data);
         let responseData = response.data;
+
+        logger.debug(responseData.message, `A booking with ID ${responseData.booking_id} was created`);
 
         return responseData;
     }
@@ -207,12 +248,16 @@ export class APIInstance {
      * @returns A promise, which returns the success message
      */
     async addBooking(booking: Procedures.OpenGroupBooking): Promise<Procedures.AddBooking.Success> {
-        let data = this.getBaseJSON({
+        let data = this.getBaseJSON<Procedures.AddBooking.Request>({
             booking_id: booking.Booking_id
         });
 
+        logger.debug({ booking: booking }, `Reservation booking was requested (Open Online Group)`);
+
         let response = await this.instance.post<Procedures.AddBooking.Success>(Procedures.AddBooking.URL, data);
         let responseData = response.data;
+
+        logger.debug(responseData.message, `A booking was created`);
 
         return responseData;
     }
@@ -224,8 +269,12 @@ export class APIInstance {
     async myBookings(): Promise<Procedures.MyBookings.Success> {
         let data = this.getBaseJSON<Procedures.MyBookings.Request>();
 
+        logger.debug(`API fetched active bookings`);
+
         let response = await this.instance.post<Procedures.MyBookings.Success>(Procedures.MyBookings.URL, data);
         let responseData = response.data;
+
+        logger.debug(responseData.message);
 
         return responseData;
     }
@@ -240,8 +289,12 @@ export class APIInstance {
             booking_id: booking.booking_id
         });
 
+        logger.debug(booking, `Canceling booking`);
+
         let response = await this.instance.post<Procedures.MyBookings.Success>(Procedures.MyBookings.URL, data);
         let responseData = response.data;
+
+        logger.debug(responseData.message);
 
         return responseData;
     }

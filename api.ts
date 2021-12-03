@@ -1,6 +1,5 @@
 import * as fs from "fs";
-import { APIClient } from "./src/APIClient";
-import { default as dayjs } from 'dayjs';
+import { APIClient } from "./src/classes/APIClient";
 
 const { URL, token, customer_id, license } = JSON.parse(fs.readFileSync("data/sensitive.json", "UTF-8"));
 
