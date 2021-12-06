@@ -129,7 +129,7 @@ export class APIClient {
      * @returns an enum value of either OnlineGroup or OnlineGroup_Open
      * @throws an error if the name is not found in both groups
      */
-    async resolveGroup(groupName: string): Promise<GroupResponse> {
+    protected async resolveGroup(groupName: string): Promise<GroupResponse> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
@@ -152,10 +152,18 @@ export class APIClient {
     /**
      * Reserves a spot for the given group
      * @param groupName the name of the group
-     * @param date the date at which it should be booked
+     * @param date the date at which it should be booked as a string
      * @param description the description of the place (Only applicable for OnlineGroups Open)
      * @returns the booking object from the bookings of the user
      */
+    async reserve(groupName: string, date: string, description?: string): Promise<Procedures.Booking>;
+    /**
+     * Reserves a spot for a given group as a given time
+     * @param groupName the name of the group
+     * @param date the date at which the it should be booked as a Date object
+     * @param description the description of the group (only used if an Online Group Open is reserved)
+     */
+    async reserve(groupName: string, date: Date, description?: string): Promise<Procedures.Booking>;
     async reserve(groupName: string, date: string | Date, description?: string): Promise<Procedures.Booking> {
         // Check if initialized
         if (!this.initialized) {
@@ -190,7 +198,7 @@ export class APIClient {
      * @param schedule_ID the ID of the schedule used
      * @returns an open booking in formation
      */
-    async findOnlineGroupBooking(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<Procedures.OpenGroupBooking> {
+    protected async findOnlineGroupBooking(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<Procedures.OpenGroupBooking> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
@@ -240,7 +248,13 @@ export class APIClient {
             throw new Error(`Booking with name ${groupName}, at date ${date.toString()} did not exist`);
         return booking;
     }
-
+    
+    
+    /**
+     * Reserves a spot with the information about the booking fetched at an earlier time (please see function prepareReservationOnlineGroup())
+     * @param prepared a preprepared booking
+     */
+    protected async reserveOnlineGroup(prepared: ReserveOG): Promise<Procedures.OpenGroupBooking>;
     /**
      * Books a spot for an Online Group
      * @param groupName the name of the Online Group
@@ -248,7 +262,8 @@ export class APIClient {
      * @param startTime the start time of the slot
      * @returns the booking, which should be booked
      */
-    async reserveOnlineGroup(groupName: string | ReserveOG, date?: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<Procedures.OpenGroupBooking> {
+    protected async reserveOnlineGroup(groupName: string, date?: Date, site_description?: string, schedule_ID?: number): Promise<Procedures.OpenGroupBooking>;
+    protected async reserveOnlineGroup(groupName: string | ReserveOG, date?: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<Procedures.OpenGroupBooking> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
@@ -264,10 +279,18 @@ export class APIClient {
         else
             booking = groupName.booking;
         await this.api.addBooking(booking);
-        await this.checkOpenGroupBooking(parseInt(booking.Booking_id));
+        await this.checkBooking(parseInt(booking.Booking_id));
         return booking;
     }
 
+    /**
+     * Prepares a statement, which can be executed without fetching the information one more time
+     * @param groupName the name of the group
+     * @param date the date at which it should be reserved
+     * @param site_description the description of the site
+     * @param schedule_ID the id of the schedule
+     * @returns an object containing all information needed to reserve a spot
+     */
     async prepareReservationOnlineGroup(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<ReserveOG> {
         return {
             action: "ReserveOG",
@@ -281,7 +304,7 @@ export class APIClient {
      * @param description description of the group
      * @returns the product
      */
-    async findOnlineGroupOpenProduct(groupName: string, description: string): Promise<Product> {
+    protected async findOnlineGroupOpenProduct(groupName: string, description: string): Promise<Product> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
@@ -314,7 +337,7 @@ export class APIClient {
      * @param date the date for which the product needs to be reserved
      * @returns an empty slot
      */
-    async findOnlineGroupOpenBooking(product: Product, date: Date = new Date()): Promise<Procedures.EmptySlot> {
+    protected async findOnlineGroupOpenBooking(product: Product, date: Date = new Date()): Promise<Procedures.EmptySlot> {
         // Retrieve the available slots (as the schedule is highly dynamic, this will always be refreshed)
         let retrieveSlots = await this.api.getAvailableSlots(product, date);
         product.availableSlots = {};
@@ -339,7 +362,7 @@ export class APIClient {
      * @param date the date for which the slot belongs
      * @returns the booking id of the newly created booking
      */
-    async reserveOnlineGroupOpen(groupName: string | ReserveOGOpen, description?: string, date: Date = new Date()): Promise<number> {
+    protected async reserveOnlineGroupOpen(groupName: string | ReserveOGOpen, description?: string, date: Date = new Date()): Promise<number> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
@@ -366,7 +389,7 @@ export class APIClient {
      * @param date the date for which the slot is reserved
      * @returns A prepared statement to reserve a spot
      */
-    async prepareReservationOnlineGroupOpen(groupName: string, description: string, date: Date = new Date()): Promise<ReserveOGOpen> {
+    protected async prepareReservationOnlineGroupOpen(groupName: string, description: string, date: Date = new Date()): Promise<ReserveOGOpen> {
         // find the product
         let targetProduct = await this.findOnlineGroupOpenProduct(groupName, description);
         // see if there is an empty slot
@@ -413,7 +436,7 @@ export class APIClient {
      * @param booking the number of the booking
      * @returns true, if the booking was found
      */
-    async checkOpenGroupBooking(bookingNumber: number): Promise<boolean> {
+    async checkBooking(bookingNumber: number): Promise<boolean> {
         await this.updateBookings();
         if (this.info.bookings![bookingNumber])
             return true;
