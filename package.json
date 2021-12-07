@@ -1,6 +1,6 @@
 {
   "name": "x-sec-api",
-  "version": "0.2.0",
+  "version": "0.9.0",
   "description": "An educational project to exercise my skills and knowledge working with Burp Suite and reverse engineering",
   "main": "build/index.js",
   "types": "dist/index.d.ts",
@@ -9,7 +9,7 @@
   ],
   "scripts": {
     "compile": "tsc",
-    "start": "tsc && node build/index.js",
+    "start": "tsc",
     "test": "echo \"Yeah, no tests, sorry Andy :(\""
   },
   "keywords": [
@@ -26,7 +26,6 @@
   "dependencies": {
     "axios": "^0.24.0",
     "dayjs": "^1.10.7",
-    "fs": "^0.0.1-security",
     "pino": "^7.5.1"
   }
 }
