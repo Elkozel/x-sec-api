@@ -63,7 +63,7 @@ enum GroupResponse {
 }
 
 export class APIClient {
-    protected info: APIInfo = { // Information, retrieved from the API
+    public info: APIInfo = { // Information, retrieved from the API
         onlineGroups: {},
         onlineGroupsOpen: {}
     };
