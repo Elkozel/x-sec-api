@@ -710,7 +710,7 @@ export class APIClient extends APIInstance {
      */
     async checkBooking(bookingNumber: number, token: Token): Promise<boolean>
     async checkBooking(bookingNumber: number, token: Token = this.token): Promise<boolean> {
-        await this.updateBookings();
+        await this.updateBookings(token);
         if (this.info.bookings![bookingNumber])
             return true;
         return false;
