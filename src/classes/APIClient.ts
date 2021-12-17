@@ -810,7 +810,7 @@ export class APIClient extends APIInstance {
      */
     async prepareReservation(groupName: string, date: Date, description: string | undefined, token: Token): Promise<ReserveOG | ReserveOGOpen>;
     async prepareReservation(groupName: string, date: Date, description: string, token: Token = this.token): Promise<ReserveOG | ReserveOGOpen> {
-        switch (await this.resolveGroup(groupName)) {
+        switch (await this.resolveGroup(groupName, token)) {
             case GroupResponse.OnlineGoup_Open:
                 return await this.prepareReservationOnlineGroupOpen(groupName, description, date, token);
             case GroupResponse.OnlineGroup:
