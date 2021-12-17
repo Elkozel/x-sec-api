@@ -6,6 +6,7 @@ const logger = pino({
     name: "API Client"
 })
 
+type Token = string | undefined;
 
 /**
  * Extends on the Unique Locations per Online Group
@@ -62,23 +63,30 @@ enum GroupResponse {
     OnlineGoup_Open
 }
 
-export class APIClient {
+export class APIClient extends APIInstance {
     public info: APIInfo = { // Information, retrieved from the API
         onlineGroups: {},
         onlineGroupsOpen: {}
     };
-    protected api: APIInstance; // The API instance used to issue the calls
     private initialized = false;
 
+    /**
+     * Creates a tokenless API Client instance, which handles the functionallity of the API
+     * @param customer_id the ID of the customer
+     * @param license the licence of the customer
+     * @param URL the URL to which the API should connect
+     */
+    constructor(customer_id: string, license: string, URL: string)
     /**
      * Creates an API Client instance, which handles the functionallity of the API
      * @param customer_id the ID of the customer
      * @param license the licence of the customer
-     * @param token the token, belonging to the user
      * @param URL the URL to which the API should connect
+     * @param token the token of the user
      */
-    constructor(customer_id: string, license: string, token: string, URL: string) {
-        this.api = new APIInstance(customer_id, license, token, URL);
+    constructor(customer_id: string, license: string, URL: string, token: Token)
+    constructor(customer_id: string, license: string, URL: string, token?: Token) {
+        super(customer_id, license, URL, token);
     }
 
 
@@ -98,17 +106,22 @@ export class APIClient {
      * - checks the user 
      * - the version of the API
      */
-    async init(): Promise<void> {
+    async init(token: Token = this.token): Promise<void> {
         logger.info(`Initializing API Client`);
 
-        this.api.checkVersion();
+        // Check the version
+        let version = await this.checkVersion();
+
+        // Check the token
+        if (!token)
+            throw new Error(`Token must be specified!`);
 
         // Retrieve login information about the user
-        let usr = await this.api.logIn();
+        let usr = await this.logIn(token);
         this.info.userInfo = usr.user;
 
         // Retrieve online groups
-        let groups = await this.api.onlineGroups();
+        let groups = await this.onlineGroups(token);
 
         // Initialize groups object
         this.info.onlineGroups = {};
@@ -125,7 +138,7 @@ export class APIClient {
 
         // Retrieve bookings
         this.info.bookings = {};
-        let allBookings = await this.api.myBookings();
+        let allBookings = await this.myBookings(token);
 
         // Store the bookings
         allBookings.mybookings.forEach(el => {
@@ -173,12 +186,29 @@ export class APIClient {
      * @param groupName the name of the group
      * @returns an enum value of either OnlineGroup or OnlineGroup_Open
      * @throws an error if the name is not found in both groups
+    */
+    protected async resolveGroup(groupName: string): Promise<GroupResponse>;
+    /**
+    * Resolves whether the group is an Online or Online_Open group
+    * @param groupName the name of the group
+    * @param token the token of the user
+    * @returns an enum value of either OnlineGroup or OnlineGroup_Open
+    * @throws an error if the name is not found in both groups
+    */
+    protected async resolveGroup(groupName: string, token: string): Promise<GroupResponse>;
+    /**
+     * Resolves whether the group is an Online or Online_Open group
+     * @param groupName the name of the group
+     * @param token the token of the user
+     * @returns an enum value of either OnlineGroup or OnlineGroup_Open
+     * @throws an error if the name is not found in both groups
      */
-    protected async resolveGroup(groupName: string): Promise<GroupResponse> {
+    protected async resolveGroup(groupName: string, token: Token): Promise<GroupResponse>;
+    protected async resolveGroup(groupName: string, token?: Token): Promise<GroupResponse> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
-            await this.init();
+            await this.init(token);
         }
 
         // Check onlineGroups
@@ -195,42 +225,78 @@ export class APIClient {
     }
 
     /**
-     * Reserves a spot for the given group
+     * Reserves a spot for an Online Group
+     * @warning the group can only be Online Group (not Open)!
      * @param groupName the name of the group
-     * @param date the date at which it should be booked as a string
-     * @param description the description of the place (Only applicable for OnlineGroups Open)
+     * @param date the date at which it should be booked
      * @returns the booking object from the bookings of the user
      */
-    async reserve(groupName: string, date: string, description?: string): Promise<Procedures.Booking>;
+    async reserve(groupName: string, date: string): Promise<Procedures.Booking>;
     /**
-     * Reserves a spot for a given group as a given time
+     * Reserves a spot for an Online Group
+     * @warning the group can only be Online Group (not Open)!
      * @param groupName the name of the group
-     * @param date the date at which the it should be booked as a Date object
-     * @param description the description of the group (only used if an Online Group Open is reserved)
+     * @param date the date at which it should be booked
+     * @returns the booking object from the bookings of the user
      */
-    async reserve(groupName: string, date: Date, description?: string): Promise<Procedures.Booking>;
-    async reserve(groupName: string, date: string | Date, description?: string): Promise<Procedures.Booking> {
+    async reserve(groupName: string, date: Date): Promise<Procedures.Booking>;
+    /**
+     * Reserves a spot for the given group
+     * @param groupName the name of the group
+     * @param date the date at which it should be booked
+     * @param description the description of the group (only used if an Online Group Open is reserved)
+     * @returns the booking object from the bookings of the user
+     */
+    async reserve(groupName: string, date: string, description: string): Promise<Procedures.Booking>;
+    /**
+     * Reserves a spot for a given group at a given time
+     * @param groupName the name of the group
+     * @param date the date at which the it should be booked
+     * @param description the description of the group (only used if an Online Group Open is reserved)
+     * @returns the booking object from the bookings of the user
+     */
+    async reserve(groupName: string, date: Date, description: string): Promise<Procedures.Booking>;
+    /**
+     * Reserves a spot for the given group
+     * @param groupName the name of the group
+     * @param date the date at which it should be booked
+     * @param description the description of the group (only used if an Online Group Open is reserved)
+     * @param token the token of the user
+     * @returns the booking object from the bookings of the user
+     */
+    async reserve(groupName: string, date: string, description: string | undefined, token: string): Promise<Procedures.Booking>;
+    /**
+     * Reserves a spot for a given group at a given time
+     * @param groupName the name of the group
+     * @param date the date at which the it should be booked
+     * @param description the description of the group (only used if an Online Group Open is reserved)
+     * @param token the token of the user
+     * @returns the booking object from the bookings of the user
+     */
+    async reserve(groupName: string, date: Date, description: string | undefined, token: Token): Promise<Procedures.Booking>;
+    async reserve(groupName: string, date: string | Date, description?: string, token: Token = this.token): Promise<Procedures.Booking> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
-            await this.init();
+            await this.init(token);
         }
 
         if (typeof date === "string") // Handle if Date is a string
             date = new Date(date);
 
         var booking_id: number = -1;
-        switch (await this.resolveGroup(groupName)) {
+        switch (await this.resolveGroup(groupName, token)) { // Check which type the Online Group is
             case GroupResponse.OnlineGoup_Open:
                 if (!description) throw new Error(`Cannot reserve an Open Online group without a description`);
-                booking_id = await this.reserveOnlineGroupOpen(groupName, description, date)
+                booking_id = await this.reserveOnlineGroupOpen(groupName, description, date, token)
                 break;
             case GroupResponse.OnlineGroup:
-                booking_id = parseInt((await this.reserveOnlineGroup(groupName, date)).Booking_id);
+                booking_id = parseInt((await this.reserveOnlineGroup(groupName, date, undefined, undefined, token)).Booking_id);
                 break;
         }
+        // Check if the booking exists (was created)
         if (booking_id && booking_id != -1)
-            return await this.findBooking(booking_id);
+            return await this.findBooking(booking_id, token);
         throw new Error(`The booking for ${groupName} at date ${date.toString()} could not be resolved`);
 
     }
@@ -248,35 +314,91 @@ export class APIClient {
      */
 
     /**
-     * Reserves a spot with the information about the booking fetched at an earlier time (please see function prepareReservationOnlineGroup())
+     * Reserves a spot with the information about the booking fetched at an earlier time
+     * @see prepareReservation() the function, which prepares the statement
      * @param prepared a preprepared booking
+     * @returns the Open Booking
      */
     protected async reserveOnlineGroup(prepared: ReserveOG): Promise<Procedures.OpenGroupBooking>;
     /**
+     * [TOKENLESS] Reserves a spot with the information about the booking fetched at an earlier time
+     * @see prepareReservation()
+     * @param prepared a preprepared booking
+     * @param token the token of the user
+     * @returns the Open Booking
+     */
+    protected async reserveOnlineGroup(prepared: ReserveOG, token: Token): Promise<Procedures.OpenGroupBooking>;
+    /**
+     * [TOKENLESS] Reserves a spot with the information about the booking fetched at an earlier time
+     * @see prepareReservation()
+     * @param prepared a preprepared booking
+     * @param token the token of the user
+     * @returns the Open Booking
+     */
+    protected async reserveOnlineGroup(prepared: ReserveOG, token: string): Promise<Procedures.OpenGroupBooking>;
+    /**
+     * Books a spot for an Online Group
+     * @param groupName the name of the OnlineGroup
+     * @param date the date to be booked
+     * @returns the Open Booking
+     */
+    protected async reserveOnlineGroup(groupName: string, date: Date): Promise<Procedures.OpenGroupBooking>;
+    /**
      * Books a spot for an Online Group
      * @param groupName the name of the Online Group
-     * @param targetDay the day, which is targeted
-     * @param startTime the start time of the slot
-     * @returns the booking, which should be booked
+     * @param date the date to be booked
+     * @param site_description the description of the site
+     * @param schedule_ID the ID of the schedule
+     * @returns the Open Booking
      */
-    protected async reserveOnlineGroup(groupName: string, date?: Date, site_description?: string, schedule_ID?: number): Promise<Procedures.OpenGroupBooking>;
-    protected async reserveOnlineGroup(groupName: string | ReserveOG, date?: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<Procedures.OpenGroupBooking> {
+    protected async reserveOnlineGroup(groupName: string, date: Date, site_description: string, schedule_ID: number): Promise<Procedures.OpenGroupBooking>;
+    /**
+     * [TOKENLESS] Books a spot for an Online Group
+     * @param groupName the name of the Online Group
+     * @param date the date to be booked
+     * @param site_description the description of the site
+     * @param schedule_ID the ID of the schedule
+     * @param token the token of the user
+     * @returns the Open Booking
+     */
+    protected async reserveOnlineGroup(groupName: string, date: Date, site_description: string | undefined, schedule_ID: number | undefined, token: Token): Promise<Procedures.OpenGroupBooking>;
+    protected async reserveOnlineGroup(groupName_or_prepared: string | ReserveOG, date_or_token?: Date | Token, site_description: string = "X TU Delft", schedule_ID: number = 0, token?: Token): Promise<Procedures.OpenGroupBooking> {
+        // Check if it is not a prepared statement
+        if (typeof groupName_or_prepared === "string") {
+            if (!date_or_token || typeof date_or_token === "string") // Check if the date is defined
+                throw new Error(`Date was not provided for booking of ${groupName_or_prepared}`)
+            return await this.reserveOnlineGroup_Arguments(groupName_or_prepared, date_or_token, site_description, schedule_ID, token);
+        }
+        // Else it is a prepared statement
+        if (date_or_token instanceof Date)
+            throw new Error(`A prepared statement was called incorrectly (${groupName_or_prepared}, ${date_or_token})`);
+        return await this.reserveOnlineGroup_Prepared(groupName_or_prepared, date_or_token)
+    }
+
+    private async reserveOnlineGroup_Prepared(groupName: ReserveOG): Promise<Procedures.OpenGroupBooking>;
+    private async reserveOnlineGroup_Prepared(groupName: ReserveOG, token: Token): Promise<Procedures.OpenGroupBooking>;
+    private async reserveOnlineGroup_Prepared(groupName: ReserveOG, token: string): Promise<Procedures.OpenGroupBooking>;
+    private async reserveOnlineGroup_Prepared(groupName: ReserveOG, token: Token = this.token): Promise<Procedures.OpenGroupBooking> {
+        await this.addBooking(groupName.booking, token); // Reserve the spot
+        await this.checkBooking(parseInt(groupName.booking.Booking_id), token); // Check if the booking exists
+        return groupName.booking;
+    }
+
+    private async reserveOnlineGroup_Arguments(groupName: string, date: Date): Promise<Procedures.OpenGroupBooking>;
+    private async reserveOnlineGroup_Arguments(groupName: string, date: Date, site_description: string, schedule_ID: number): Promise<Procedures.OpenGroupBooking>;
+    private async reserveOnlineGroup_Arguments(groupName: string, date: Date, site_description: string, schedule_ID: number, token: Token): Promise<Procedures.OpenGroupBooking>;
+    private async reserveOnlineGroup_Arguments(groupName: string, date: Date, site_description: string, schedule_ID: number, token: string): Promise<Procedures.OpenGroupBooking>;
+    private async reserveOnlineGroup_Arguments(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0, token: Token = this.token): Promise<Procedures.OpenGroupBooking> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
             await this.init();
         }
         // Retrieve the booking
-        let booking;
-        if (typeof groupName === "string") {
-            if (!date) // Check if the date is defined
-                throw new Error(`Date was not provided for booking of ${groupName}`)
-            booking = await this.findOnlineGroupBooking(groupName, date, site_description, schedule_ID);
-        }
-        else
-            booking = groupName.booking;
-        await this.api.addBooking(booking);
-        await this.checkBooking(parseInt(booking.Booking_id));
+        let booking = await this.findOnlineGroupBooking(groupName, date, site_description, schedule_ID, token);
+
+        await this.addBooking(booking, token); // Reserve the spot
+        await this.checkBooking(parseInt(booking.Booking_id), token); // Check if the booking exists
         return booking;
     }
 
@@ -284,15 +406,34 @@ export class APIClient {
      * Finds an online booking
      * @param groupName the name of the group
      * @param date the date of the booking
-     * @param site_description the description of the site
-     * @param schedule_ID the ID of the schedule used
      * @returns an open booking in formation
      */
-    protected async findOnlineGroupBooking(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<Procedures.OpenGroupBooking> {
+    protected async findOnlineGroupBooking(groupName: string, date: Date): Promise<Procedures.OpenGroupBooking>;
+    /**
+     * [TOKENLESS] Finds an online booking
+     * @param groupName the name of the group
+     * @param date the date of the booking
+     * @param site_description the description of the site
+     * @param schedule_ID the ID of the schedule used
+     * @param token the token of the user
+     * @returns an open booking in formation
+     */
+    protected async findOnlineGroupBooking(groupName: string, date: Date, site_description: string, schedule_ID: number, token: Token): Promise<Procedures.OpenGroupBooking>;
+    /**
+     * [TOKENLESS] Finds an online booking
+     * @param groupName the name of the group
+     * @param date the date of the booking
+     * @param site_description the description of the site
+     * @param schedule_ID the ID of the schedule used
+     * @param token the token of the user
+     * @returns an open booking in formation
+     */
+    protected async findOnlineGroupBooking(groupName: string, date: Date, site_description: string, schedule_ID: number, token: string): Promise<Procedures.OpenGroupBooking>;
+    protected async findOnlineGroupBooking(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0, token: Token = this.token): Promise<Procedures.OpenGroupBooking> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
-            await this.init();
+            await this.init(token);
         }
 
         // Retrieve the group
@@ -306,7 +447,7 @@ export class APIClient {
             // Initialize object
             onlineGroup.uniqueLocations = {};
             // Retrieve all locations
-            let allLocations = await this.api.UniqueLocationsByOnlineGroup(onlineGroup);
+            let allLocations = await this.UniqueLocationsByOnlineGroup(onlineGroup, token);
             // Store all locations
             allLocations.uniquelocationsbyonlinegroup.forEach(el => {
                 onlineGroup.uniqueLocations![el.description] = el; // Typescript was complaining that this could be undefined
@@ -319,7 +460,7 @@ export class APIClient {
             throw new Error(`Error, the group ${groupName} does not have a site ${site_description}`);
 
         // Retrieve the schedule (as the schedule is highly dynamic, this will always be refreshed)
-        let schedule = await this.api.schedule(onlineGroup, location.site_id);
+        let schedule = await this.schedule(onlineGroup, location.site_id, undefined, undefined, undefined, token);
         // Store the schedule
         location.schedule = {};
         schedule.schedule.forEach(el => {
@@ -352,37 +493,97 @@ export class APIClient {
      */
 
     /**
-     * Reserves a spot with the information about the booking fetched at an earlier time (please see function prepareReservationOnlineGroupOpen())
+     * Reserves a spot with the information about the booking fetched at an earlier time
+     * @see prepareReservation()
      * @param prepared the prepared booking
+     * @returns the booking id of the newly created booking
      */
     protected async reserveOnlineGroupOpen(prepared: ReserveOGOpen): Promise<number>;
+    /**
+     * [TOKENLESS] Reserves a spot with the information about the booking fetched at an earlier time
+     * @see prepareReservation()
+     * @param prepared the prepared booking.
+     * @param token the token of the user
+     * @returns the booking id of the newly created booking
+     */
+    protected async reserveOnlineGroupOpen(prepared: ReserveOGOpen, token: string): Promise<number>;
+    /**
+     * [TOKENLESS] Reserves a spot with the information about the booking fetched at an earlier time
+     * @see prepareReservation()
+     * @param prepared the prepared booking
+     * @param token the token of the user
+     * @returns the booking id of the newly created booking
+     */
+    protected async reserveOnlineGroupOpen(prepared: ReserveOGOpen, token: Token): Promise<number>;
+    /**
+     * Creates a reservation for an Online Group Open
+     * @param groupName The name of the group
+     * @returns the booking id of the newly created booking
+     */
+    protected async reserveOnlineGroupOpen(groupName: string): Promise<number>;
     /**
      * Creates a reservation for an Online Group Open
      * @param groupName The name of the group
      * @param description The description of the group
-     * @param start_date the start date of the slot
-     * @param date the date for which the slot belongs
+     * @param date the date for the slot
      * @returns the booking id of the newly created booking
      */
-    protected async reserveOnlineGroupOpen(groupName: string, description?: string, date?: Date): Promise<number>;
-    protected async reserveOnlineGroupOpen(groupName: string | ReserveOGOpen, description?: string, date: Date = new Date()): Promise<number> {
+    protected async reserveOnlineGroupOpen(groupName: string, description: string, date: Date): Promise<number>;
+    /**
+     * [TOKENLESS] Creates a reservation for an Online Group Open
+     * @param groupName The name of the group
+     * @param description The description of the group
+     * @param date the date for the slot
+     * @param token the token of the user
+     * @returns the booking id of the newly created booking
+     */
+    protected async reserveOnlineGroupOpen(groupName: string, description: string, date: Date, token: string): Promise<number>;
+    /**
+     * [TOKENLESS] Creates a reservation for an Online Group Open
+     * @param groupName The name of the group
+     * @param description The description of the group
+     * @param date the date for the slot
+     * @param token the token of the user
+     * @returns the booking id of the newly created booking
+     */
+    protected async reserveOnlineGroupOpen(groupName: string, description: string, date: Date, token: Token): Promise<number>;
+    protected async reserveOnlineGroupOpen(groupName_or_prepared: string | ReserveOGOpen, description_or_token?: string | Token, date: Date = new Date(), token: Token = this.token): Promise<number> {
+        // Check if the first argument is not a prepared statement
+        if (typeof groupName_or_prepared === "string") {
+            // Check if description is provided
+            if (!description_or_token)
+                throw new Error("Description was not provided");
+            return await this.reserveOnlineGroupOpen_Arguments(groupName_or_prepared, description_or_token, date, token);
+        }
+
+        // Otherwise it is a prepared statement
+        return await this.reserveOnlineGroupOpen_Prepared(groupName_or_prepared, description_or_token);
+    }
+
+    private async reserveOnlineGroupOpen_Prepared(prepared: ReserveOGOpen): Promise<number>
+    private async reserveOnlineGroupOpen_Prepared(prepared: ReserveOGOpen, token: string): Promise<number>
+    private async reserveOnlineGroupOpen_Prepared(prepared: ReserveOGOpen, token: Token): Promise<number>
+    private async reserveOnlineGroupOpen_Prepared(prepared: ReserveOGOpen, token: Token = this.token): Promise<number> {
+        return await (await this.addReservationBooking(prepared.emptySlot, prepared.targetProduct, token)).booking_id;
+    }
+
+    private async reserveOnlineGroupOpen_Arguments(groupName: string, description: string): Promise<number>
+    private async reserveOnlineGroupOpen_Arguments(groupName: string, description: string, date: Date): Promise<number>
+    private async reserveOnlineGroupOpen_Arguments(groupName: string, description: string, date: Date, token: Token): Promise<number>
+    private async reserveOnlineGroupOpen_Arguments(groupName: string, description: string, date: Date, token: string): Promise<number>
+    private async reserveOnlineGroupOpen_Arguments(groupName: string, description: string, date: Date = new Date(), token: Token = this.token): Promise<number> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
             await this.init();
         }
-        // See if a prepared statement was passed to the function
-        if (typeof groupName !== "string")
-            return await (await this.api.addReservationBooking(groupName.emptySlot, groupName.targetProduct)).booking_id;
-        // Check if description is provided
-        if (!description)
-            throw new Error("Description was not provided");
+
         // find the product
-        let targetProduct = await this.findOnlineGroupOpenProduct(groupName, description);
+        let targetProduct = await this.findOnlineGroupOpenProduct(groupName, description, token);
         // see if there is an empty slot
-        let emptySlot = await this.findOnlineGroupOpenBooking(targetProduct, date);
+        let emptySlot = await this.findOnlineGroupOpenBooking(targetProduct, date, token);
         // Reserve the slot
-        return await (await this.api.addReservationBooking(emptySlot, targetProduct)).booking_id;
+        return await (await this.addReservationBooking(emptySlot, targetProduct, token)).booking_id;
     }
 
     /**
@@ -391,7 +592,25 @@ export class APIClient {
      * @param description description of the group
      * @returns the product
      */
-    protected async findOnlineGroupOpenProduct(groupName: string, description: string): Promise<Product> {
+    protected async findOnlineGroupOpenProduct(groupName: string, description: string): Promise<Product>;
+
+    /**
+     * [TOKENLESS] Returns an Online Group Open product, given a name and description
+     * @param groupName the name of the group
+     * @param description description of the group
+     * @param token the token of the user
+     * @returns the product
+     */
+    protected async findOnlineGroupOpenProduct(groupName: string, description: string, token: string): Promise<Product>;
+    /**
+     * [TOKENLESS] Returns an Online Group Open product, given a name and description
+     * @param groupName the name of the group
+     * @param description description of the group
+     * @param token the token of the user
+     * @returns the product
+     */
+    protected async findOnlineGroupOpenProduct(groupName: string, description: string, token: Token): Promise<Product>;
+    protected async findOnlineGroupOpenProduct(groupName: string, description: string, token: Token = this.token): Promise<Product> {
         // Check if initialized
         if (!this.initialized) {
             logger.warn(`A function was called without initializing the API Client, please call init() first, this time we did it for you`);
@@ -404,8 +623,8 @@ export class APIClient {
         if (!onlineGroupOpen.products) {
             onlineGroupOpen.products = {};
             // Gather all info (with some detailed explanation)
-            let allProducts = await (await this.api.getProductsByOnlineGroup(onlineGroupOpen)).Products; // Get all products (the API only returns a description and an ID)
-            let resolvedProducts = await Promise.all(allProducts.map(prod => this.api.getProductById(prod))) // Get the full information for each product
+            let allProducts = await (await this.getProductsByOnlineGroup(onlineGroupOpen, undefined, token)).Products; // Get all products (the API only returns a description and an ID)
+            let resolvedProducts = await Promise.all(allProducts.map(prod => this.getProductById(prod, token))) // Get the full information for each product
             resolvedProducts.forEach(el => {
                 onlineGroupOpen.products![el.Product.Description] = el.Product; // store each product
             })
@@ -424,9 +643,26 @@ export class APIClient {
      * @param date the date for which the product needs to be reserved
      * @returns an empty slot
      */
-    protected async findOnlineGroupOpenBooking(product: Product, date: Date = new Date()): Promise<Procedures.EmptySlot> {
+    protected async findOnlineGroupOpenBooking(product: Product, date: Date): Promise<Procedures.EmptySlot>;
+    /**
+     * [TOKENLESS] Finds a booking, given a product and the date
+     * @param product the product to be reserved
+     * @param date the date for which the product needs to be reserved
+     * @param token the token of the user
+     * @returns an empty slot
+     */
+    protected async findOnlineGroupOpenBooking(product: Product, date: Date, token: Token): Promise<Procedures.EmptySlot>;
+    /**
+     * [TOKENLESS] Finds a booking, given a product and the date
+     * @param product the product to be reserved
+     * @param date the date for which the product needs to be reserved
+     * @param token the token of the user
+     * @returns an empty slot
+     */
+    protected async findOnlineGroupOpenBooking(product: Product, date: Date, token: Token): Promise<Procedures.EmptySlot>;
+    protected async findOnlineGroupOpenBooking(product: Product, date: Date = new Date(), token: Token = this.token): Promise<Procedures.EmptySlot> {
         // Retrieve the available slots (as the schedule is highly dynamic, this will always be refreshed)
-        let retrieveSlots = await this.api.getAvailableSlots(product, date);
+        let retrieveSlots = await this.getAvailableSlots(product, date, token);
         product.availableSlots = {};
         // Store available slots
         retrieveSlots.Divided_slots.forEach(el => {
@@ -458,7 +694,22 @@ export class APIClient {
      * @param booking the number of the booking
      * @returns true, if the booking was found
      */
-    async checkBooking(bookingNumber: number): Promise<boolean> {
+    async checkBooking(bookingNumber: number): Promise<boolean>
+    /**
+     * [TOKENLESS] Checks if a booking exists
+     * @param booking the number of the booking
+     * @param token the token of the user
+     * @returns true, if the booking was found
+     */
+    async checkBooking(bookingNumber: number, token: string): Promise<boolean>
+    /**
+     * [TOKENLESS] Checks if a booking exists
+     * @param booking the number of the booking
+     * @param token the token of the user
+     * @returns true, if the booking was found
+     */
+    async checkBooking(bookingNumber: number, token: Token): Promise<boolean>
+    async checkBooking(bookingNumber: number, token: Token = this.token): Promise<boolean> {
         await this.updateBookings();
         if (this.info.bookings![bookingNumber])
             return true;
@@ -470,9 +721,24 @@ export class APIClient {
      * @param booking_ID the ID of the booking
      * @returns A booking
      */
-    async findBooking(booking_ID: number): Promise<Procedures.Booking> {
+    async findBooking(booking_ID: number): Promise<Procedures.Booking>;
+    /**
+     * [TOKENLESS] Finds a booking from its ID
+     * @param booking_ID the ID of the booking
+     * @param token the toke of the user
+     * @returns A booking
+     */
+    async findBooking(booking_ID: number, token: string): Promise<Procedures.Booking>;
+    /**
+     * [TOKENLESS] Finds a booking from its ID
+     * @param booking_ID the ID of the booking
+     * @param token the toke of the user
+     * @returns A booking
+     */
+    async findBooking(booking_ID: number, token: Token): Promise<Procedures.Booking>;
+    async findBooking(booking_ID: number, token: Token = this.token): Promise<Procedures.Booking> {
         // Update bookings
-        await this.updateBookings();
+        await this.updateBookings(token);
         // Retrieve the booking
         let booking = this.info.bookings![booking_ID];
         // Check if the booking exists
@@ -485,9 +751,20 @@ export class APIClient {
     /**
      * Updates the bookings that the user has
      */
-    async updateBookings(): Promise<void> {
+    async updateBookings(): Promise<void>
+    /**
+     * [TOKENLESS] Updates the bookings that the user has
+     * @param token the token of the user
+     */
+    async updateBookings(token: string): Promise<void>;
+    /**
+     * [TOKENLESS] Updates the bookings that the user has
+     * @param token the token of the user
+     */
+    async updateBookings(token: Token): Promise<void>;
+    async updateBookings(token: Token = this.token): Promise<void> {
         this.info.bookings = {};
-        let allBookings = await this.api.myBookings();
+        let allBookings = await this.myBookings(token);
 
         allBookings.mybookings.forEach(el => {
             this.info.bookings![el.booking_id] = el;
@@ -513,12 +790,31 @@ export class APIClient {
      * @param description the description of the slot
      * @returns a prepared statement
      */
-    async prepareReservation(groupName: string, date: Date, description: string): Promise<ReserveOG | ReserveOGOpen> {
+    async prepareReservation(groupName: string, date: Date, description: string): Promise<ReserveOG | ReserveOGOpen>;
+    /**
+     * [TOKENLESS] Prepares a statement to reserve a spot
+     * @param groupName the name of the group
+     * @param date the date at which the slot is reserved
+     * @param description the description of the slot
+     * @param token the token of the user
+     * @returns a prepared statement
+     */
+    async prepareReservation(groupName: string, date: Date, description: string | undefined, token: string): Promise<ReserveOG | ReserveOGOpen>;
+    /**
+     * [TOKENLESS] Prepares a statement to reserve a spot
+     * @param groupName the name of the group
+     * @param date the date at which the slot is reserved
+     * @param description the description of the slot
+     * @param token the token of the user
+     * @returns a prepared statement
+     */
+    async prepareReservation(groupName: string, date: Date, description: string | undefined, token: Token): Promise<ReserveOG | ReserveOGOpen>;
+    async prepareReservation(groupName: string, date: Date, description: string, token: Token = this.token): Promise<ReserveOG | ReserveOGOpen> {
         switch (await this.resolveGroup(groupName)) {
             case GroupResponse.OnlineGoup_Open:
-                return await this.prepareReservationOnlineGroupOpen(groupName, description, date);
+                return await this.prepareReservationOnlineGroupOpen(groupName, description, date, token);
             case GroupResponse.OnlineGroup:
-                return await this.prepareReservationOnlineGroup(groupName, date, description);
+                return await this.prepareReservationOnlineGroup(groupName, date, description, undefined, token);
         }
     }
 
@@ -529,11 +825,30 @@ export class APIClient {
      * @param date the date for which the slot is reserved
      * @returns A prepared statement to reserve a spot
      */
-    protected async prepareReservationOnlineGroupOpen(groupName: string, description: string, date: Date = new Date()): Promise<ReserveOGOpen> {
+    protected async prepareReservationOnlineGroupOpen(groupName: string, description: string, date: Date): Promise<ReserveOGOpen>;
+    /**
+     * [TOKENLESS] Creates a stetement to reserve a spot
+     * @param groupName the name of the group
+     * @param description the description of the group
+     * @param date the date for which the slot is reserved
+     * @param token the token of the user
+     * @returns A prepared statement to reserve a spot
+     */
+    protected async prepareReservationOnlineGroupOpen(groupName: string, description: string, date: Date, token: string): Promise<ReserveOGOpen>;
+    /**
+     * [TOKENLESS] Creates a stetement to reserve a spot
+     * @param groupName the name of the group
+     * @param description the description of the group
+     * @param date the date for which the slot is reserved
+     * @param token the token of the user
+     * @returns A prepared statement to reserve a spot
+     */
+    protected async prepareReservationOnlineGroupOpen(groupName: string, description: string, date: Date, token: Token): Promise<ReserveOGOpen>;
+    protected async prepareReservationOnlineGroupOpen(groupName: string, description: string, date: Date = new Date(), token: Token = this.token): Promise<ReserveOGOpen> {
         // find the product
-        let targetProduct = await this.findOnlineGroupOpenProduct(groupName, description);
+        let targetProduct = await this.findOnlineGroupOpenProduct(groupName, description, token);
         // see if there is an empty slot
-        let emptySlot = await this.findOnlineGroupOpenBooking(targetProduct, date);
+        let emptySlot = await this.findOnlineGroupOpenBooking(targetProduct, date, token);
         // returned a prepared statement
         return {
             action: "ReserveOGOpen",
@@ -546,28 +861,63 @@ export class APIClient {
      * Prepares a statement, which can be executed without fetching the information one more time
      * @param groupName the name of the group
      * @param date the date at which it should be reserved
-     * @param site_description the description of the site
-     * @param schedule_ID the id of the schedule
      * @returns an object containing all information needed to reserve a spot
      */
-    protected async prepareReservationOnlineGroup(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0): Promise<ReserveOG> {
+    protected async prepareReservationOnlineGroup(groupName: string, date: Date): Promise<ReserveOG>;
+    /**
+     * [TOKENLESS] Prepares a statement, which can be executed without fetching the information one more time
+     * @param groupName the name of the group
+     * @param date the date at which it should be reserved
+     * @param site_description the description of the site
+     * @param schedule_ID the id of the schedule
+     * @param token the token of the user
+     * @returns an object containing all information needed to reserve a spot
+     */
+    protected async prepareReservationOnlineGroup(groupName: string, date: Date, site_description: string | undefined, schedule_ID: number | undefined, token: string): Promise<ReserveOG>;
+    /**
+     * [TOKENLESS] Prepares a statement, which can be executed without fetching the information one more time
+     * @param groupName the name of the group
+     * @param date the date at which it should be reserved
+     * @param site_description the description of the site
+     * @param schedule_ID the id of the schedule
+     * @param token the token of the user
+     * @returns an object containing all information needed to reserve a spot
+     */
+    protected async prepareReservationOnlineGroup(groupName: string, date: Date, site_description: string | undefined, schedule_ID: number | undefined, token: Token): Promise<ReserveOG>;
+    protected async prepareReservationOnlineGroup(groupName: string, date: Date, site_description: string = "X TU Delft", schedule_ID: number = 0, token: Token = this.token): Promise<ReserveOG> {
         return {
             action: "ReserveOG",
-            booking: await this.findOnlineGroupBooking(groupName, date, site_description, schedule_ID)
+            booking: await this.findOnlineGroupBooking(groupName, date, site_description, schedule_ID, token)
         }
     }
 
     /**
      * executes a command, which was prepared in advance
      * @param command the command which needs to be executed
+     * @returns the booking number of the reservation
      */
-    async execute(command: PreparedStatement) {
+    async execute(command: PreparedStatement): Promise<number>;
+    /**
+     * [TOKENLESS] executes a command, which was prepared in advance
+     * @param command the command which needs to be executed
+     * @param token the token on the user
+     * @returns the booking number of the reservation
+     */
+    async execute(command: PreparedStatement, token: string): Promise<number>;
+    /**
+     * [TOKENLESS] executes a command, which was prepared in advance
+     * @param command the command which needs to be executed
+     * @param token the token on the user
+     * @returns the booking number of the reservation
+     */
+    async execute(command: PreparedStatement, token: Token): Promise<number>;
+    async execute(command: PreparedStatement, token: Token = this.token): Promise<number> {
         switch (command.action) {
             case "ReserveOG":
-                this.reserveOnlineGroup(command as ReserveOG);
+                return parseInt((await this.reserveOnlineGroup(command as ReserveOG, token)).Booking_id)
                 break;
             case "ReserveOGOpen":
-                this.reserveOnlineGroupOpen(command as ReserveOGOpen);
+                return await this.reserveOnlineGroupOpen(command as ReserveOGOpen, token);
                 break;
             default:
                 logger.warn(command, `Execution  of the command ${command.action} was not resolved`);
@@ -576,16 +926,16 @@ export class APIClient {
     }
 }
 
-interface PreparedStatement {
+export interface PreparedStatement {
     action: string;
 };
 
-interface ReserveOG extends PreparedStatement {
+export interface ReserveOG extends PreparedStatement {
     action: "ReserveOG",
     booking: Procedures.OpenGroupBooking
 }
 
-interface ReserveOGOpen extends PreparedStatement {
+export interface ReserveOGOpen extends PreparedStatement {
     action: "ReserveOGOpen",
     targetProduct: Product,
     emptySlot: Procedures.EmptySlot
