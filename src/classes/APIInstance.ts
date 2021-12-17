@@ -45,6 +45,7 @@ export class APIInstance {
     constructor(customer_id: string, license: string, URL: string, token?: Token) {
         this.customer_id = customer_id;
         this.license = license;
+        this.token = token;
 
         this.instance = axios.create({
             baseURL: URL
