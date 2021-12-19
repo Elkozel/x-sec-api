@@ -739,9 +739,9 @@ export class APIClient extends APIInstance {
     async findBooking(booking_ID: number, token: Token): Promise<Procedures.Booking>;
     async findBooking(booking_ID: number, token: Token = this.token): Promise<Procedures.Booking> {
         // Update bookings
-        await this.updateBookings(token);
+        let bookings = await (await this.myBookings(token)).mybookings;
         // Retrieve the booking
-        let booking = this.info.bookings![booking_ID];
+        let booking = bookings![booking_ID];
         // Check if the booking exists
         if (!booking)
             throw new Error(`Could not find booking number ${booking_ID}`);
