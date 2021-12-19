@@ -467,20 +467,20 @@ export class APIInstance {
      * Retrieves all bookings of the customer
      * @returns an array of Booking, representing each booking of the user
      */
-    protected async myBookings(): Promise<Procedures.MyBookings.Success>;
+    async myBookings(): Promise<Procedures.MyBookings.Success>;
     /**
      * [TOKENLESS] Retrieves all bookings of the customer
      * @param token the token of the user
      * @returns an array of Booking, representing each booking of the user
      */
-    protected async myBookings(token: string): Promise<Procedures.MyBookings.Success>;
+    async myBookings(token: string): Promise<Procedures.MyBookings.Success>;
     /**
      * [TOKENLESS] Retrieves all bookings of the customer
      * @param token the token of the user
      * @returns an array of Booking, representing each booking of the user
      */
-    protected async myBookings(token: Token): Promise<Procedures.MyBookings.Success>;
-    protected async myBookings(token: Token = this.token): Promise<Procedures.MyBookings.Success> {
+    async myBookings(token: Token): Promise<Procedures.MyBookings.Success>;
+    async myBookings(token: Token = this.token): Promise<Procedures.MyBookings.Success> {
         let data = this.getBaseJSON<Procedures.MyBookings.Request>({}, token);
 
         logger.debug(`API fetched active bookings`);
