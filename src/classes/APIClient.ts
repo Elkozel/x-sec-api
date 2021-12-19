@@ -118,7 +118,8 @@ export class APIClient extends APIInstance {
 
         // Retrieve login information about the user
         let usr = await this.logIn(token);
-        this.info.userInfo = usr.user;
+        if(this.token) // If the insatance is not tokenless
+            this.info.userInfo = usr.user;
 
         // Retrieve online groups
         let groups = await this.onlineGroups(token);
