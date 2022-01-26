@@ -1,3 +1,6 @@
+# Farewell, Aquarius, and we thank you. \[Long pause.\]
+This project has reached it's end of life, as the API is not used anymore. It will **not** be maintained anymore and should **not** be used.
+
 # API Client for the TU Delft X Sports Center
 
 ## Description
